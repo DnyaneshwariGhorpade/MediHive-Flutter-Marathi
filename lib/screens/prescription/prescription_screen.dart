@@ -297,7 +297,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
       await syncQueueRepo.insert({
         'id': SyncIdGenerator.nextId(),
         'entity_type': 'opd_visit',
-        'entity_id': _latestRecord['sync_id'] as String? ?? '${_latestRecord['id']}',
+        'entity_id': _latestRecord['opd_id'] as String? ?? '${_latestRecord['id']}',
         'status': 'pending',
         'retry_count': 0,
         'created_at': DateTime.now().toIso8601String(),
