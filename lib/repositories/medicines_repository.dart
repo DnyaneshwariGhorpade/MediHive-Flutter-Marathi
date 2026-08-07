@@ -46,6 +46,12 @@ class MedicinesRepository {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
+  Future<int> getMaxId() async {
+    final db = await _db;
+    final result = await db.rawQuery('SELECT MAX(id) AS max_id FROM $tableMedicines');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   Future<List<Map<String, dynamic>>> search(String query) async {
     final db = await _db;
     return db.query(tableMedicines,

@@ -7,6 +7,8 @@ import '../theme/app_theme.dart';
 import '../services/google_auth_service.dart';
 import '../services/sync_manager.dart';
 import '../repositories/clinic_settings_repository.dart';
+import '../repositories/sync_queue_repository.dart';
+import '../utils/sync_id_generator.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final ClinicSettingsRepository _settingsRepo = ClinicSettingsRepository();
@@ -253,6 +255,25 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool('darkMode', _darkMode);
   }
 
+  Future<void> _addSyncQueueEntry(String entityType, String entityId) async {
+    try {
+      final syncQueueRepo = SyncQueueRepository();
+      await syncQueueRepo.insert({
+        'id': SyncIdGenerator.nextId(),
+        'entity_type': entityType,
+        'entity_id': entityId,
+        'status': 'pending',
+        'retry_count': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      Future.microtask(() {
+        SyncManager().forceSyncNow();
+      });
+    } catch (e) {
+      debugPrint('SettingsProvider: failed to enqueue sync: $e');
+    }
+  }
+
   Future<void> updateDoctorProfile({
     required String name,
     required String specialty,
@@ -270,12 +291,14 @@ class SettingsProvider extends ChangeNotifier {
     await _saveClinicSettingsRow();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('doctorSpecialty', specialty);
+    await _addSyncQueueEntry('clinic_settings', 'default');
   }
 
   Future<void> updateDoctorProfileImage(String base64Image) async {
     _doctorProfileImage = base64Image;
     notifyListeners();
     await _saveClinicSettingsRow();
+    await _addSyncQueueEntry('clinic_settings', 'default');
   }
 
   Future<void> updateClinicInfo({
@@ -293,6 +316,7 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
 
     await _saveClinicSettingsRow();
+    await _addSyncQueueEntry('clinic_settings', 'default');
   }
 
   @override

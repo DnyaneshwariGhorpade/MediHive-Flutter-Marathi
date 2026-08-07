@@ -13,6 +13,7 @@ import '../../models/prescription.dart';
 import '../../providers/settings_provider.dart';
 import '../../repositories/patient_repository.dart';
 import '../../repositories/opd_record_repository.dart';
+import '../../repositories/medicines_repository.dart';
 import '../../repositories/sync_queue_repository.dart';
 import '../../services/sync_manager.dart';
 import '../../utils/sync_id_generator.dart';
@@ -272,6 +273,10 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
         .toList();
     final newMedicinesRaw = newMedicinesList.map((m) => m.name).join(', ');
 
+    for (final m in newMedicinesList) {
+      await _ensureMedicineInMaster(m.name);
+    }
+
     final opdRepo = OpdRecordRepository();
     final updatedRow = Map<String, dynamic>.from(_latestRecord);
     updatedRow['diagnosis'] = newDiagnosis.isNotEmpty
@@ -341,6 +346,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     );
     _rx = updatedRx;
 
+    if (!mounted) return;
     setState(() => _isEditing = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -355,6 +361,32 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     setState(() {
       _medicineFields.add(_MedicineFieldData());
     });
+  }
+
+  Future<void> _ensureMedicineInMaster(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    try {
+      final repo = MedicinesRepository();
+      final existing = await repo.getByName(trimmed);
+      if (existing != null) return;
+      final maxId = await repo.getMaxId();
+      await repo.insert({'id': maxId + 1, 'name': trimmed});
+      final syncQueueRepo = SyncQueueRepository();
+      await syncQueueRepo.insert({
+        'id': SyncIdGenerator.nextId(),
+        'entity_type': 'medicine',
+        'entity_id': trimmed,
+        'status': 'pending',
+        'retry_count': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      Future.microtask(() {
+        SyncManager().forceSyncNow();
+      });
+    } catch (e) {
+      debugPrint('PrescriptionScreen: failed to save medicine to master list: $e');
+    }
   }
 
   void _removeMedicine(int index) {
@@ -736,26 +768,61 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                                             ],
                                           ),
                                           SizedBox(height: 8),
-                                          TextField(
-                                            controller: e.value.name,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              color: AppTheme.textPrimary,
-                                              fontSize: 13,
-                                            ),
-                                            decoration: InputDecoration(
-                                                  labelText: l10n.medicineName,
-                                              isDense: true,
-                                              contentPadding:
-                                                  EdgeInsets.symmetric(
+                                          Autocomplete<String>(
+                                            textEditingController: e.value.name,
+                                            displayStringForOption: (o) => o,
+                                            optionsBuilder:
+                                                (TextEditingValue t) async {
+                                              final query = t.text.trim();
+                                              if (query.isEmpty) {
+                                                return const Iterable<String>
+                                                    .empty();
+                                              }
+                                              final results =
+                                                  await MedicinesRepository()
+                                                      .search(query);
+                                              return results
+                                                  .map((r) =>
+                                                      r['name'] as String)
+                                                  .take(8);
+                                            },
+                                            onSelected: (selection) {
+                                              _ensureMedicineInMaster(
+                                                  selection);
+                                            },
+                                            fieldViewBuilder: (context,
+                                                controller,
+                                                focusNode,
+                                                onFieldSubmitted) {
+                                              return TextField(
+                                                controller: controller,
+                                                focusNode: focusNode,
+                                                onSubmitted: (_) =>
+                                                    onFieldSubmitted(),
+                                                style: TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.w500,
+                                                  color: AppTheme.textPrimary,
+                                                  fontSize: 13,
+                                                ),
+                                                decoration: InputDecoration(
+                                                      labelText:
+                                                          l10n.medicineName,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      EdgeInsets.symmetric(
                                                     horizontal: 10,
                                                     vertical: 8,
                                                   ),
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                            ),
+                                                  border: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
+                                                  ),
+                                                ),
+                                              );
+                                            },
                                           ),
                                           SizedBox(height: 8),
                                           Row(

@@ -8,12 +8,17 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'api_service.dart';
 import 'connectivity_service.dart';
 import 'firebase_messaging_service.dart';
+import '../utils/sync_id_generator.dart';
 import '../models/appointment_model.dart';
 import '../repositories/patient_repository.dart';
 import '../repositories/opd_record_repository.dart';
 import '../repositories/sync_queue_repository.dart';
 import '../repositories/patient_images_repository.dart';
 import '../repositories/device_registration_repository.dart';
+import '../repositories/clinic_settings_repository.dart';
+import '../repositories/calendar_notes_repository.dart';
+import '../repositories/medicines_repository.dart';
+import '../repositories/symptoms_master_repository.dart';
 import '../database/database_helper.dart';
 import 'dart:math' show Random;
 
@@ -34,6 +39,10 @@ class SyncManager extends ChangeNotifier {
   final SyncQueueRepository _syncQueueRepo = SyncQueueRepository();
   final PatientImagesRepository _imagesRepo = PatientImagesRepository();
   final DeviceRegistrationRepository _deviceRegRepo = DeviceRegistrationRepository();
+  final ClinicSettingsRepository _settingsRepo = ClinicSettingsRepository();
+  final CalendarNotesRepository _notesRepo = CalendarNotesRepository();
+  final MedicinesRepository _medicinesRepo = MedicinesRepository();
+  final SymptomsMasterRepository _symptomsRepo = SymptomsMasterRepository();
 
   SyncState _syncState = SyncState.synced;
   bool _pendingSyncRequested = false;
@@ -130,6 +139,10 @@ class SyncManager extends ChangeNotifier {
     final pushPatients = <Map<String, dynamic>>[];
     final pushOpd = <Map<String, dynamic>>[];
     final pushAppts = <Map<String, dynamic>>[];
+    final pushSettings = <Map<String, dynamic>>[];
+    final pushNotes = <Map<String, dynamic>>[];
+    final pushMedicines = <Map<String, dynamic>>[];
+    final pushSymptoms = <Map<String, dynamic>>[];
     final deletedEntities = <Map<String, String>>[];
 
     for (final entry in pending) {
@@ -161,10 +174,31 @@ class SyncManager extends ChangeNotifier {
         } else {
           debugPrint('SYNC WARNING: opd_visit opd_id=$entityId not found in DB');
         }
+      } else if (entityType == 'clinic_settings') {
+        final row = await _settingsRepo.getFirst();
+        if (row != null) {
+          pushSettings.add(row);
+        } else {
+          debugPrint('SYNC WARNING: clinic_settings not found in DB');
+        }
+      } else if (entityType == 'calendar_note') {
+        final row = await _notesRepo.getByDate(entityId);
+        if (row != null) {
+          pushNotes.add(row);
+        } else {
+          pushNotes.add({
+            'note_date': entityId,
+            'note_text': '[]',
+          });
+        }
+      } else if (entityType == 'medicine') {
+        pushMedicines.add({'name': entityId});
+      } else if (entityType == 'symptom') {
+        pushSymptoms.add({'name': entityId});
       }
     }
 
-    debugPrint('SYNC PUSH DATA: patients=${pushPatients.length} opd=${pushOpd.length} appts=${pushAppts.length} deleted=${deletedEntities.length}');
+    debugPrint('SYNC PUSH DATA: patients=${pushPatients.length} opd=${pushOpd.length} appts=${pushAppts.length} deleted=${deletedEntities.length} settings=${pushSettings.length} notes=${pushNotes.length} medicines=${pushMedicines.length} symptoms=${pushSymptoms.length}');
 
     try {
       final apptBox = Hive.box<AppointmentModel>('appointments');
@@ -175,7 +209,7 @@ class SyncManager extends ChangeNotifier {
       }
     } catch (_) {}
 
-    if (pushPatients.isNotEmpty || pushOpd.isNotEmpty || pushAppts.isNotEmpty || deletedEntities.isNotEmpty) {
+    if (pushPatients.isNotEmpty || pushOpd.isNotEmpty || pushAppts.isNotEmpty || deletedEntities.isNotEmpty || pushSettings.isNotEmpty || pushNotes.isNotEmpty || pushMedicines.isNotEmpty || pushSymptoms.isNotEmpty) {
       debugPrint('SYNC PUSHING to backend...');
       final response = await ApiService.syncPush(
         patients: pushPatients,
@@ -183,6 +217,10 @@ class SyncManager extends ChangeNotifier {
         appointments: pushAppts,
         deletedEntities: deletedEntities,
         deviceId: _deviceId ?? '',
+        clinicSettings: pushSettings,
+        calendarNotes: pushNotes,
+        medicines: pushMedicines,
+        symptoms: pushSymptoms,
       );
 
       debugPrint('SYNC PUSH response: ${response.keys.toList()}');
@@ -261,6 +299,10 @@ class SyncManager extends ChangeNotifier {
       await _applyRemotePatients(data['patients'] as List<dynamic>? ?? []);
       await _applyRemoteOpdRecords(data['opd_records'] as List<dynamic>? ?? []);
       await _applyRemoteAppointments(data['appointments'] as List<dynamic>? ?? []);
+      await _applyRemoteClinicSettings(data['clinic_settings'] as List<dynamic>? ?? []);
+      await _applyRemoteCalendarNotes(data['calendar_notes'] as List<dynamic>? ?? []);
+      await _applyRemoteMedicines(data['medicines'] as List<dynamic>? ?? []);
+      await _applyRemoteSymptoms(data['symptoms'] as List<dynamic>? ?? []);
       await _applyRemoteDeletes(data['deleted_entities'] as List<dynamic>? ?? []);
 
       await prefs.setString(
@@ -383,6 +425,8 @@ class SyncManager extends ChangeNotifier {
             final apptBox = Hive.box<AppointmentModel>('appointments');
             if (apptBox.containsKey(eid)) await apptBox.delete(eid);
           } catch (_) {}
+        } else if (etype == 'calendar_note') {
+          await _notesRepo.deleteByDate(eid);
         }
       } catch (_) {}
     }
@@ -427,6 +471,10 @@ class SyncManager extends ChangeNotifier {
       await _applyRemotePatients(data['patients'] as List<dynamic>? ?? []);
       await _applyRemoteOpdRecords(data['opd_records'] as List<dynamic>? ?? []);
       await _applyRemoteAppointments(data['appointments'] as List<dynamic>? ?? []);
+      await _applyRemoteClinicSettings(data['clinic_settings'] as List<dynamic>? ?? []);
+      await _applyRemoteCalendarNotes(data['calendar_notes'] as List<dynamic>? ?? []);
+      await _applyRemoteMedicines(data['medicines'] as List<dynamic>? ?? []);
+      await _applyRemoteSymptoms(data['symptoms'] as List<dynamic>? ?? []);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
@@ -572,6 +620,99 @@ class SyncManager extends ChangeNotifier {
       return Platform.isAndroid ? 'Android' : Platform.isIOS ? 'iOS' : 'Unknown';
     } catch (_) {
       return 'Unknown';
+    }
+  }
+
+  Future<void> _applyRemoteClinicSettings(List<dynamic> remoteSettings) async {
+    for (final json in remoteSettings) {
+      try {
+        final map = Map<String, dynamic>.from(json as Map);
+        final remoteUpdated = DateTime.tryParse(map['updated_at']?.toString() ?? '');
+        final existing = await _settingsRepo.getFirst();
+        final localUpdated = DateTime.tryParse(existing?['updated_at'] as String? ?? '');
+
+        if (existing == null || (remoteUpdated != null && localUpdated != null && remoteUpdated.isAfter(localUpdated))) {
+          await _settingsRepo.upsert({
+            'doctor_name': map['doctor_name']?.toString() ?? '',
+            'doctor_email': map['doctor_email']?.toString() ?? '',
+            'doctor_contact': map['doctor_contact']?.toString() ?? '',
+            'doctor_license_no': map['doctor_license_no']?.toString() ?? '',
+            'doctor_photo_path': map['doctor_photo_path']?.toString() ?? '',
+            'clinic_name': map['clinic_name']?.toString() ?? '',
+            'clinic_logo_path': map['clinic_logo_path']?.toString() ?? '',
+            'clinic_address': map['clinic_address']?.toString() ?? '',
+            'clinic_phone': map['clinic_phone']?.toString() ?? '',
+            'website': map['website']?.toString() ?? '',
+            'operating_hours': map['operating_hours']?.toString() ?? '',
+            'updated_at': map['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _applyRemoteCalendarNotes(List<dynamic> remoteNotes) async {
+    for (final json in remoteNotes) {
+      try {
+        final map = Map<String, dynamic>.from(json as Map);
+        final date = map['note_date']?.toString() ?? '';
+        if (date.isEmpty) continue;
+
+        final remoteUpdated = DateTime.tryParse(map['updated_at']?.toString() ?? '');
+        final existing = await _notesRepo.getByDate(date);
+        final localUpdated = DateTime.tryParse(existing?['updated_at'] as String? ?? '');
+
+        if (existing == null || (remoteUpdated != null && localUpdated != null && remoteUpdated.isAfter(localUpdated))) {
+          final noteText = map['note_text']?.toString() ?? '[]';
+          if (noteText == '[]' || noteText.isEmpty) {
+            await _notesRepo.deleteByDate(date);
+          } else {
+            if (existing != null) {
+              await _notesRepo.updateByDate(date, {
+                'note_text': noteText,
+                'updated_at': map['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+              });
+            } else {
+              await _notesRepo.insert({
+                'id': SyncIdGenerator.nextId(),
+                'note_date': date,
+                'note_text': noteText,
+                'created_at': map['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+                'updated_at': map['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+              });
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _applyRemoteMedicines(List<dynamic> remoteMedicines) async {
+    for (final json in remoteMedicines) {
+      try {
+        final map = Map<String, dynamic>.from(json as Map);
+        final name = map['name']?.toString().trim() ?? '';
+        if (name.isEmpty) continue;
+        final existing = await _medicinesRepo.getByName(name);
+        if (existing == null) {
+          final maxId = await _medicinesRepo.getMaxId();
+          await _medicinesRepo.insert({'id': maxId + 1, 'name': name});
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _applyRemoteSymptoms(List<dynamic> remoteSymptoms) async {
+    for (final json in remoteSymptoms) {
+      try {
+        final map = Map<String, dynamic>.from(json as Map);
+        final name = map['name']?.toString().trim() ?? '';
+        if (name.isEmpty) continue;
+        final existing = await _symptomsRepo.getByName(name);
+        if (existing == null) {
+          await _symptomsRepo.insert({'name': name});
+        }
+      } catch (_) {}
     }
   }
 

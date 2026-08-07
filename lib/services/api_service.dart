@@ -262,17 +262,25 @@ static String get baseUrl =>
     required List<Map<String, dynamic>> appointments,
     List<Map<String, String>> deletedEntities = const [],
     String deviceId = '',
+    List<Map<String, dynamic>> clinicSettings = const [],
+    List<Map<String, dynamic>> calendarNotes = const [],
+    List<Map<String, dynamic>> medicines = const [],
+    List<Map<String, dynamic>> symptoms = const [],
   }) async {
     await _loadToken();
     final prefs = await SharedPreferences.getInstance();
-final clinicId = prefs.getString('clinic_id') ?? '';
-    debugPrint('SYNC API syncPush: patients=${patients.length} opdRecords=${opdRecords.length} appointments=${appointments.length} deleted=${deletedEntities.length}');
+    final clinicId = prefs.getString('clinic_id') ?? '';
+    debugPrint('SYNC API syncPush: patients=${patients.length} opdRecords=${opdRecords.length} appointments=${appointments.length} deleted=${deletedEntities.length} settings=${clinicSettings.length} notes=${calendarNotes.length} medicines=${medicines.length} symptoms=${symptoms.length}');
     final body = <String, dynamic>{
       'patients': patients,
       'opd_records': opdRecords,
       'appointments': appointments,
       'device_id': deviceId,
       'clinic_id': clinicId,
+      'clinic_settings': clinicSettings,
+      'calendar_notes': calendarNotes,
+      'medicines': medicines,
+      'symptoms': symptoms,
     };
     if (deletedEntities.isNotEmpty) {
       body['deleted_entities'] = deletedEntities;

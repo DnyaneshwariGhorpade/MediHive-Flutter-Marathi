@@ -123,6 +123,169 @@ def _format_opd(r):
     return res
 
 
+_CLINIC_SETTINGS_FIELDS = [
+    'doctor_name', 'doctor_email', 'doctor_contact', 'doctor_license_no',
+    'doctor_photo_path', 'clinic_name', 'clinic_logo_path', 'clinic_address',
+    'clinic_phone', 'website', 'operating_hours',
+]
+
+
+def _upsert_clinic_settings(clinic_id, payload, now):
+    """Upsert the single clinic_settings row for a clinic (last-write-wins).
+
+    Returns (row_dict_or_None, conflict_message_or_None).
+    """
+    remote_updated = payload.get('updated_at') or now
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM clinic_settings WHERE clinic_id = %s ORDER BY id ASC LIMIT 1",
+            (clinic_id,),
+        ).fetchone()
+
+        fields = {f: payload.get(f, '') or '' for f in _CLINIC_SETTINGS_FIELDS}
+        if row is not None:
+            local_updated = row.get('updated_at') or row.get('created_at') or ''
+            if local_updated and remote_updated < local_updated:
+                return dict(row), (
+                    f"clinic_settings update skipped: local record is newer "
+                    f"(local={local_updated}, remote={remote_updated})"
+                )
+            assignments = ", ".join(f"{k} = %s" for k in fields)
+            db.execute(
+                f"UPDATE clinic_settings SET {assignments}, updated_at = %s WHERE id = %s",
+                (*fields.values(), remote_updated, row['id']),
+            )
+        else:
+            columns = ', '.join(fields.keys())
+            placeholders = ', '.join(['%s'] * len(fields))
+            db.execute(
+                f"INSERT INTO clinic_settings ({columns}, created_at, updated_at, clinic_id) "
+                f"VALUES ({placeholders}, %s, %s, %s)",
+                (*fields.values(), now, remote_updated, clinic_id),
+            )
+        db.commit()
+
+        result = db.execute(
+            "SELECT * FROM clinic_settings WHERE clinic_id = %s ORDER BY id ASC LIMIT 1",
+            (clinic_id,),
+        ).fetchone()
+        return (dict(result) if result else None), None
+    finally:
+        db.close()
+
+
+def _upsert_calendar_note(clinic_id, user_id, payload, now):
+    """Upsert or delete a calendar note for a clinic (last-write-wins).
+
+    Empty / '[]' note_text is treated as a delete.  Returns
+    (row_dict_or_None, conflict_message_or_None).
+    """
+    note_date = (payload.get('note_date') or '').strip()
+    if not note_date:
+        return None, None
+
+    note_text = payload.get('note_text', '[]')
+    db = get_db()
+    try:
+        if note_text is None or str(note_text) == '[]' or not str(note_text).strip():
+            db.execute(
+                "DELETE FROM calendar_notes WHERE note_date = %s AND clinic_id = %s",
+                (note_date, clinic_id),
+            )
+            db.commit()
+            DeletedEntity.record('calendar_note', note_date, user_id=user_id, clinic_id=clinic_id)
+            return {'note_date': note_date, 'deleted': True}, None
+
+        remote_created = payload.get('created_at') or now
+        remote_updated = payload.get('updated_at') or now
+        row = db.execute(
+            "SELECT * FROM calendar_notes WHERE note_date = %s AND clinic_id = %s",
+            (note_date, clinic_id),
+        ).fetchone()
+        if row is not None:
+            local_updated = row.get('updated_at') or row.get('created_at') or ''
+            if local_updated and remote_updated < local_updated:
+                return dict(row), (
+                    f"calendar_note {note_date} update skipped: local record is newer "
+                    f"(local={local_updated}, remote={remote_updated})"
+                )
+            db.execute(
+                "UPDATE calendar_notes SET note_text = %s, updated_at = %s WHERE note_date = %s AND clinic_id = %s",
+                (str(note_text), remote_updated, note_date, clinic_id),
+            )
+        else:
+            db.execute(
+                "INSERT INTO calendar_notes (note_date, note_text, created_at, updated_at, user_id, clinic_id) "
+                "VALUES (%s, %s, %s, %s, %s, %s) "
+                "ON CONFLICT (note_date) DO UPDATE "
+                "SET note_text = EXCLUDED.note_text, updated_at = EXCLUDED.updated_at "
+                "WHERE calendar_notes.clinic_id = EXCLUDED.clinic_id",
+                (note_date, str(note_text), remote_created, remote_updated, user_id, clinic_id),
+            )
+        db.commit()
+
+        result = db.execute(
+            "SELECT * FROM calendar_notes WHERE note_date = %s AND clinic_id = %s",
+            (note_date, clinic_id),
+        ).fetchone()
+        return (dict(result) if result else {'note_date': note_date, 'deleted': True}), None
+    finally:
+        db.close()
+
+
+def _upsert_master_item(table, name):
+    """Ensure a master-list item (medicines / symptoms_master) exists."""
+    name = (name or '').strip()
+    if not name:
+        return None
+    db = get_db()
+    try:
+        db.execute(
+            f"INSERT INTO {table} (name) VALUES (%s) "
+            f"ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name",
+            (name,),
+        )
+        db.commit()
+        return {'name': name}
+    finally:
+        db.close()
+
+
+def _latest_clinic_settings(clinic_id):
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM clinic_settings WHERE clinic_id = %s ORDER BY id ASC LIMIT 1",
+            (clinic_id,),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        db.close()
+
+
+def _calendar_notes_since(clinic_id, last_sync):
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT * FROM calendar_notes WHERE clinic_id = %s "
+            "AND COALESCE(NULLIF(updated_at, ''), created_at) > %s ORDER BY updated_at",
+            (clinic_id, last_sync),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        db.close()
+
+
+def _all_master_items(table):
+    db = get_db()
+    try:
+        rows = db.execute(f"SELECT name FROM {table} ORDER BY name").fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        db.close()
+
+
 # ── Device Registration ─────────────────────────────
 
 @sync_bp.route('/register-device', methods=['POST'])
@@ -167,15 +330,28 @@ def sync_upload():
     now = datetime.utcnow().isoformat()
 
     logger.info(
-        "UPLOAD clinic=%s device=%s patients=%d opd_records=%d appointments=%d deleted=%d",
+        "UPLOAD clinic=%s device=%s patients=%d opd_records=%d appointments=%d "
+        "settings=%d notes=%d medicines=%d symptoms=%d deleted=%d",
         clinic_id, device_id,
         len(data.get('patients', [])),
         len(data.get('opd_records', [])),
         len(data.get('appointments', [])),
+        len(data.get('clinic_settings', [])),
+        len(data.get('calendar_notes', [])),
+        len(data.get('medicines', [])),
+        len(data.get('symptoms', [])),
         len(data.get('deleted_entities', [])),
     )
 
-    results = {'patients': [], 'opd_records': [], 'appointments': []}
+    results = {
+        'patients': [],
+        'opd_records': [],
+        'appointments': [],
+        'clinic_settings': [],
+        'calendar_notes': [],
+        'medicines': [],
+        'symptoms': [],
+    }
     sheet_sync_errors = []
     temp_id_map = {}
     conflicts = []
@@ -318,6 +494,33 @@ def sync_upload():
         except Exception as exc:
             logger.warning("Delete sync failed for %s %s: %s", etype, eid, exc)
 
+    # ── Clinic Settings (single row per clinic, last-write-wins) ──
+    for s in data.get('clinic_settings', []):
+        s['clinic_id'] = clinic_id
+        result, conflict = _upsert_clinic_settings(clinic_id, s, now)
+        if result:
+            results['clinic_settings'].append(result)
+        if conflict:
+            conflicts.append(conflict)
+
+    # ── Calendar Notes (per-date, last-write-wins; empty text = delete) ──
+    for n in data.get('calendar_notes', []):
+        result, conflict = _upsert_calendar_note(clinic_id, user_id, n, now)
+        if conflict:
+            conflicts.append(conflict)
+        if result is not None:
+            results['calendar_notes'].append(result)
+
+    # ── Medicines & Symptoms Master Lists (global, dedup by name) ──
+    for m in data.get('medicines', []):
+        item = _upsert_master_item('medicines', m.get('name'))
+        if item:
+            results['medicines'].append(item)
+    for sym in data.get('symptoms', []):
+        item = _upsert_master_item('symptoms_master', sym.get('name'))
+        if item:
+            results['symptoms'].append(item)
+
     # ── Write sync log to cloud_sync_log ──
     try:
         db = get_db()
@@ -387,17 +590,29 @@ def sync_download():
     formatted_patients = [_format_patient(p) for p in patients]
     formatted_opd = [_format_opd(o) for o in opd_records]
 
+    clinic_settings = _latest_clinic_settings(clinic_id)
+    calendar_notes = _calendar_notes_since(clinic_id, last_sync)
+    medicines = _all_master_items('medicines')
+    symptoms = _all_master_items('symptoms_master')
+
     logger.info(
-        "DOWNLOAD clinic=%s since=%s patients=%d opd=%d appts=%d deleted=%d",
+        "DOWNLOAD clinic=%s since=%s patients=%d opd=%d appts=%d settings=%s notes=%d medicines=%d symptoms=%d deleted=%d",
         clinic_id, last_sync,
         len(formatted_patients), len(formatted_opd),
-        len(appointments), len(deleted_entities),
+        len(appointments),
+        'present' if clinic_settings else 'none',
+        len(calendar_notes), len(medicines), len(symptoms),
+        len(deleted_entities),
     )
 
     return jsonify({
         'patients': formatted_patients,
         'opd_records': formatted_opd,
         'appointments': appointments,
+        'clinic_settings': [clinic_settings] if clinic_settings else [],
+        'calendar_notes': calendar_notes,
+        'medicines': medicines,
+        'symptoms': symptoms,
         'deleted_entities': deleted_entities,
         'server_time': datetime.utcnow().isoformat(),
     }), 200
@@ -431,11 +646,20 @@ def full_restore():
 
     clinic = Clinic.get(clinic_id)
 
+    clinic_settings = _latest_clinic_settings(clinic_id)
+    calendar_notes = _calendar_notes_since(clinic_id, '2000-01-01T00:00:00')
+    medicines = _all_master_items('medicines')
+    symptoms = _all_master_items('symptoms_master')
+
     return jsonify({
         'clinic': clinic,
         'patients': formatted_patients,
         'opd_records': formatted_opd,
         'appointments': appointments,
+        'clinic_settings': [clinic_settings] if clinic_settings else [],
+        'calendar_notes': calendar_notes,
+        'medicines': medicines,
+        'symptoms': symptoms,
         'deleted_entities': deleted_entities,
         'server_time': datetime.utcnow().isoformat(),
     }), 200

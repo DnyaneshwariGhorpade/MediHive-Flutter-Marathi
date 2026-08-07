@@ -11,6 +11,8 @@ import '../repositories/opd_record_repository.dart';
 import 'notification_provider.dart';
 import '../services/daily_summary_service.dart';
 import '../utils/sync_id_generator.dart';
+import '../repositories/sync_queue_repository.dart';
+import '../services/sync_manager.dart';
 
 class AppointmentProvider extends ChangeNotifier {
   final CalendarNotesRepository _notesRepo = CalendarNotesRepository();
@@ -337,6 +339,25 @@ class AppointmentProvider extends ChangeNotifier {
     return hiveKey;
   }
 
+  Future<void> _addSyncQueueEntry(String entityType, String entityId) async {
+    try {
+      final syncQueueRepo = SyncQueueRepository();
+      await syncQueueRepo.insert({
+        'id': SyncIdGenerator.nextId(),
+        'entity_type': entityType,
+        'entity_id': entityId,
+        'status': 'pending',
+        'retry_count': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      Future.microtask(() {
+        SyncManager().forceSyncNow();
+      });
+    } catch (e) {
+      debugPrint('AppointmentProvider: failed to enqueue sync: $e');
+    }
+  }
+
   Future<void> _saveNotesForDate(String hiveKey, List<String> notes) async {
     try {
       final sqlDate = _hiveKeyToSqlDate(hiveKey);
@@ -357,6 +378,7 @@ class AppointmentProvider extends ChangeNotifier {
           'updated_at': now,
         });
       }
+      await _addSyncQueueEntry('calendar_note', sqlDate);
     } catch (e, st) {
       debugPrint('SYNC QUEUE INSERT FAILED: $e');
       debugPrintStack(stackTrace: st);
@@ -368,6 +390,7 @@ class AppointmentProvider extends ChangeNotifier {
     try {
       final sqlDate = _hiveKeyToSqlDate(hiveKey);
       await _notesRepo.deleteByDate(sqlDate);
+      await _addSyncQueueEntry('calendar_note', sqlDate);
     } catch (e, st) {
       debugPrint('DELETE NOTES FAILED: $e');
       debugPrintStack(stackTrace: st);
