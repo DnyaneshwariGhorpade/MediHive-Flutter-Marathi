@@ -93,6 +93,32 @@ class DBConnection:
         except Exception:
             pass
 
+    def savepoint(self, name):
+        self._cursor.execute(f"SAVEPOINT {name}")
+
+    def rollback_to_savepoint(self, name):
+        try:
+            self._cursor.execute(f"ROLLBACK TO SAVEPOINT {name}")
+        except Exception:
+            pass
+
+    _savepoint_counter = 0
+
+    def try_execute(self, sql, params=None):
+        """Execute a statement inside a savepoint so a failure only
+        rolls back that statement, not the surrounding transaction."""
+        DBConnection._savepoint_counter += 1
+        name = f"sp_mig_{DBConnection._savepoint_counter}"
+        self._cursor.execute(f"SAVEPOINT {name}")
+        try:
+            self._cursor.execute(sql, params)
+            self._cursor.execute(f"RELEASE SAVEPOINT {name}")
+        except Exception:
+            try:
+                self._cursor.execute(f"ROLLBACK TO SAVEPOINT {name}")
+            except Exception:
+                pass
+
     def close(self):
         try:
             self._cursor.close()
@@ -145,10 +171,7 @@ def _init_db():
     db.rollback()
     try:
         # Rename legacy table if it exists
-        try:
-            db.execute("ALTER TABLE opd_records RENAME TO opd_visits")
-        except Exception:
-            db.rollback()
+        db.try_execute("ALTER TABLE opd_records RENAME TO opd_visits")
 
         # Aligned Table: patients (matches source of truth + sync columns)
         db.execute("""
@@ -296,83 +319,29 @@ def _init_db():
         """)
 
         # Dynamic postgres columns and table rename migrations:
-        try:
-            db.execute("ALTER TABLE patients RENAME COLUMN name TO full_name")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE patients RENAME COLUMN mobile TO mobile_number")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE patients ADD COLUMN alternate_mobile TEXT DEFAULT ''")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE patients ADD COLUMN weight DOUBLE PRECISION DEFAULT NULL")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE patients DROP COLUMN IF EXISTS last_diagnosis")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE patients DROP COLUMN IF EXISTS last_visit_date")
-        except Exception:
-            db.rollback()
+        db.try_execute("ALTER TABLE patients RENAME COLUMN name TO full_name")
+        db.try_execute("ALTER TABLE patients RENAME COLUMN mobile TO mobile_number")
+        db.try_execute("ALTER TABLE patients ADD COLUMN alternate_mobile TEXT DEFAULT ''")
+        db.try_execute("ALTER TABLE patients ADD COLUMN weight DOUBLE PRECISION DEFAULT NULL")
+        db.try_execute("ALTER TABLE patients DROP COLUMN IF EXISTS last_diagnosis")
+        db.try_execute("ALTER TABLE patients DROP COLUMN IF EXISTS last_visit_date")
 
         # Migrating opd_visits columns
-        try:
-            db.execute("ALTER TABLE opd_visits RENAME COLUMN visit_date TO visit_datetime")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE opd_visits RENAME COLUMN type TO opd_type")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE opd_visits RENAME COLUMN discount TO discount_value")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE opd_visits ALTER COLUMN discount_value TYPE DOUBLE PRECISION USING (COALESCE(NULLIF(discount_value, ''), '0')::double precision)")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE opd_visits RENAME COLUMN next_visit TO next_visit_date")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE opd_visits RENAME COLUMN follow_up_reason TO followup_status")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS image_links TEXT DEFAULT ''")
-        except Exception:
-            db.rollback()
-        try:
-            db.execute("ALTER TABLE opd_visits DROP COLUMN IF EXISTS previous_visit_date")
-        except Exception:
-            db.rollback()
+        db.try_execute("ALTER TABLE opd_visits RENAME COLUMN visit_date TO visit_datetime")
+        db.try_execute("ALTER TABLE opd_visits RENAME COLUMN type TO opd_type")
+        db.try_execute("ALTER TABLE opd_visits RENAME COLUMN discount TO discount_value")
+        db.try_execute("ALTER TABLE opd_visits ALTER COLUMN discount_value TYPE DOUBLE PRECISION USING (COALESCE(NULLIF(discount_value, ''), '0')::double precision)")
+        db.try_execute("ALTER TABLE opd_visits RENAME COLUMN next_visit TO next_visit_date")
+        db.try_execute("ALTER TABLE opd_visits RENAME COLUMN follow_up_reason TO followup_status")
+        db.try_execute("ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS image_links TEXT DEFAULT ''")
+        db.try_execute("ALTER TABLE opd_visits DROP COLUMN IF EXISTS previous_visit_date")
 
         # Sync and role columns migration for users and appointments
         for col in ['device_id', 'sync_status', 'last_synced_at']:
-            try:
-                db.execute(f"ALTER TABLE patients ADD COLUMN {col} TEXT DEFAULT ''")
-            except Exception:
-                db.rollback()
-            try:
-                db.execute(f"ALTER TABLE opd_visits ADD COLUMN {col} TEXT DEFAULT ''")
-            except Exception:
-                db.rollback()
-            try:
-                db.execute(f"ALTER TABLE appointments ADD COLUMN {col} TEXT DEFAULT ''")
-            except Exception:
-                db.rollback()
-        try:
-            db.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'doctor'")
-        except Exception:
-            db.rollback()
+            db.try_execute(f"ALTER TABLE patients ADD COLUMN {col} TEXT DEFAULT ''")
+            db.try_execute(f"ALTER TABLE opd_visits ADD COLUMN {col} TEXT DEFAULT ''")
+            db.try_execute(f"ALTER TABLE appointments ADD COLUMN {col} TEXT DEFAULT ''")
+        db.try_execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'doctor'")
         db.execute("""
             CREATE TABLE IF NOT EXISTS appointments (
                 id          TEXT PRIMARY KEY,
