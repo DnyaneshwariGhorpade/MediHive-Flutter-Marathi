@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'sync_manager.dart';
+import 'firebase_messaging_service.dart';
 import '../repositories/device_registration_repository.dart';
 import 'dart:math' show Random;
 
@@ -108,11 +109,13 @@ class CloudSyncManager extends ChangeNotifier {
   Future<void> _registerDevice() async {
     if (_deviceId == null) return;
     try {
+      final fcmToken = FirebaseMessagingService().fcmToken;
       await ApiService.cloudRegisterDevice(
         deviceId: _deviceId!,
         deviceName: await _getDeviceName(),
         clinicId: '',
         appVersion: _getAppVersion(),
+        fcmToken: fcmToken,
       );
     } catch (_) {}
   }

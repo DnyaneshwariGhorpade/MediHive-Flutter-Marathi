@@ -909,7 +909,7 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
                     _textField(
                       l10n.weight,
                       l10n.enterWeight,
-                      opd.formData.weight?.toString() ?? '',
+                      opd.formData.weight,
                       (v) => opd.updateField('weight', v),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       validator: (value) {

@@ -20,8 +20,7 @@ if _backend_dir not in sys.path:
 from googleapiclient.discovery import build
 
 from config.google_config import config as google_config
-from services.google_auth_service import GoogleAuthService
-
+from drive_utils import get_drive_service
 
 def main() -> None:
     folder_id = google_config.drive_root_folder_id
@@ -29,17 +28,8 @@ def main() -> None:
         print("Error: GOOGLE_DRIVE_ROOT_FOLDER_ID is empty in .env", file=sys.stderr)
         sys.exit(1)
 
-    auth = GoogleAuthService(google_config.token_path)
-    creds = auth.get_credentials()
-    if creds is None:
-        print(
-            f"Error: drive_token.json not found at {google_config.token_path}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     try:
-        service = build("drive", "v3", credentials=creds)
+        service = get_drive_service()
         folder = (
             service.files()
             .get(fileId=folder_id, fields="id,name")

@@ -11,22 +11,55 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
 from googleapiclient.errors import HttpError
 
-from config import DRIVE_ROOT_FOLDER_ID, DRIVE_TOKEN_PATH
+import os
+import json
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
+from config import DRIVE_ROOT_FOLDER_ID, DRIVE_TOKEN_PATH, GOOGLE_CREDENTIALS_PATH, GOOGLE_CREDENTIALS_JSON
 from services.google_auth_service import GoogleAuthService
 from services.log_service import get_logger
 
 logger = get_logger(__name__)
-
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-
 def get_drive_service():
-    auth = GoogleAuthService(DRIVE_TOKEN_PATH)
-    creds = auth.get_credentials()
+    creds = None
+    
+    from config import DRIVE_TOKEN_JSON
+    if DRIVE_TOKEN_JSON and not os.path.exists(DRIVE_TOKEN_PATH):
+        try:
+            with open(DRIVE_TOKEN_PATH, 'w') as f:
+                f.write(DRIVE_TOKEN_JSON)
+            logger.info("Created drive_token.json from DRIVE_TOKEN_JSON env var")
+        except Exception as e:
+            logger.error("Failed to write DRIVE_TOKEN_JSON to file: %s", e)
+
+    # Try OAuth token from drive_token.json
+    try:
+        if os.path.exists(DRIVE_TOKEN_PATH):
+            auth = GoogleAuthService(DRIVE_TOKEN_PATH)
+            creds = auth.get_credentials()
+            if creds:
+                logger.info("Successfully loaded OAuth credentials for Google Drive")
+    except Exception as e:
+        logger.warning("Failed to load OAuth credentials from %s: %s. Trying service account...", DRIVE_TOKEN_PATH, e)
+        
+    # Fallback to Service Account Credentials
+    if creds is None:
+        try:
+            if GOOGLE_CREDENTIALS_JSON:
+                info = json.loads(GOOGLE_CREDENTIALS_JSON)
+                creds = ServiceAccountCredentials.from_service_account_info(info, scopes=SCOPES)
+                logger.info("Loaded Google Drive service account credentials from GOOGLE_CREDENTIALS_JSON")
+            elif os.path.exists(GOOGLE_CREDENTIALS_PATH):
+                creds = ServiceAccountCredentials.from_service_account_file(GOOGLE_CREDENTIALS_PATH, scopes=SCOPES)
+                logger.info("Loaded Google Drive service account credentials from %s", GOOGLE_CREDENTIALS_PATH)
+        except Exception as e:
+            logger.error("Failed to load service account credentials for Google Drive: %s", e)
+            
     if creds is None:
         raise RuntimeError(
             "Google Drive credentials not available. "
-            "Run utils/generate_drive_token.py first."
+            "Configure GOOGLE_CREDENTIALS_JSON or place service account credentials file, or run utils/generate_drive_token.py."
         )
     return build("drive", "v3", credentials=creds)
 

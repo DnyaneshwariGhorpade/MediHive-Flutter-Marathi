@@ -43,15 +43,15 @@ class Patient:
         db = get_db()
         db.execute("""
             INSERT INTO patients (id, full_name, dob, age, gender, blood_group, mobile_number, alternate_mobile,
-                                  created_at, updated_at, weight,
+                                  address, created_at, updated_at, weight,
                                   user_id, clinic_id, device_id, sync_status, last_synced_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             data['id'], data['full_name'], data.get('dob', ''),
             data.get('age', 0), data.get('gender', 'Not Specified'),
             data.get('blood_group', 'Not Specified'),
             data.get('mobile_number', ''), data.get('alternate_mobile', ''),
-            now, now, data.get('weight'),
+            data.get('address', ''), now, now, data.get('weight'),
             data.get('user_id', ''),
             data.get('clinic_id', ''),
             data.get('device_id', ''),
@@ -66,7 +66,7 @@ class Patient:
     def update(patient_id, data, clinic_id=None):
         now = datetime.utcnow().isoformat()
         allowed = ('full_name', 'dob', 'age', 'gender', 'blood_group', 'mobile_number',
-                   'alternate_mobile', 'weight', 'user_id',
+                   'alternate_mobile', 'address', 'weight', 'user_id',
                    'clinic_id', 'device_id', 'sync_status', 'last_synced_at')
         fields = []
         values = []
@@ -100,13 +100,13 @@ class Patient:
             if clinic_id:
                 result = db.execute(
                     "SELECT COALESCE(MAX(CAST(SUBSTR(TRIM(id), 2) AS INTEGER)), 0) + 1 AS nid "
-                    "FROM patients WHERE id LIKE 'P%' AND clinic_id = %s",
+                    "FROM patients WHERE SUBSTR(id, 1, 1) = 'P' AND clinic_id = %s",
                     (clinic_id,)
                 ).fetchone()
             else:
                 result = db.execute(
                     "SELECT COALESCE(MAX(CAST(SUBSTR(TRIM(id), 2) AS INTEGER)), 0) + 1 AS nid "
-                    "FROM patients WHERE id LIKE 'P%'"
+                    "FROM patients WHERE SUBSTR(id, 1, 1) = 'P'"
                 ).fetchone()
             next_num = result['nid']
             return f'P{next_num:03d}'

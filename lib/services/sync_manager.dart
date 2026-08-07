@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'api_service.dart';
 import 'connectivity_service.dart';
+import 'firebase_messaging_service.dart';
 import '../models/appointment_model.dart';
 import '../repositories/patient_repository.dart';
 import '../repositories/opd_record_repository.dart';
@@ -73,11 +74,13 @@ class SyncManager extends ChangeNotifier {
   Future<void> _registerDevice() async {
     if (_deviceId == null) return;
     try {
+      final fcmToken = FirebaseMessagingService().fcmToken;
       await ApiService.cloudRegisterDevice(
         deviceId: _deviceId!,
         deviceName: _getDeviceName(),
         clinicId: '',
         appVersion: '1.0.0',
+        fcmToken: fcmToken,
       );
     } catch (_) {}
   }
@@ -149,7 +152,12 @@ class SyncManager extends ChangeNotifier {
       } else if (entityType == 'opd_visit') {
         final row = await _opdRepo.getByOpdId(entityId);
         if (row != null) {
-          pushOpd.add(_opdRowToMap(row));
+          final localPatientId = row['patient_id'] as int? ?? 0;
+          final patRow = await _patientRepo.getById(localPatientId);
+          final patSyncId = patRow != null 
+              ? (patRow['sync_id'] as String? ?? 'P${localPatientId.toString().padLeft(3, '0')}') 
+              : 'P${localPatientId.toString().padLeft(3, '0')}';
+          pushOpd.add(_opdRowToMap(row, patSyncId));
         } else {
           debugPrint('SYNC WARNING: opd_visit opd_id=$entityId not found in DB');
         }
@@ -181,6 +189,45 @@ class SyncManager extends ChangeNotifier {
       final tempMapped = response['temp_ids_mapped'] as Map<String, dynamic>? ?? {};
       for (final entry in tempMapped.entries) {
         await _patientRepo.updateSyncId(entry.key, entry.value as String);
+      }
+
+      final conflicts = response['conflicts'] as List<dynamic>? ?? [];
+      if (conflicts.isNotEmpty) {
+        debugPrint('SYNC WARNING: Conflicts detected during push sync on server:');
+        for (final c in conflicts) {
+          debugPrint('  [CONFLICT] $c');
+        }
+      }
+
+      final missingPatients = response['missing_patients'] as List<dynamic>? ?? [];
+      if (missingPatients.isNotEmpty) {
+        debugPrint('SYNC WARNING: Server requested self-healing for missing patients: $missingPatients');
+        final db = await DatabaseHelper().database;
+        bool queuedAny = false;
+        for (final pId in missingPatients) {
+          final patientIdStr = pId.toString();
+          // Check if already pending in the sync queue to avoid duplicates
+          final existingQueue = await db.query(
+            'sync_queue',
+            where: 'entity_type = ? AND entity_id = ? AND (status = ? OR status IS NULL)',
+            whereArgs: ['patient', patientIdStr, 'pending'],
+          );
+          if (existingQueue.isEmpty) {
+            await _syncQueueRepo.insert({
+              'id': DateTime.now().microsecondsSinceEpoch + Random().nextInt(1000),
+              'entity_type': 'patient',
+              'entity_id': patientIdStr,
+              'operation': 'upsert',
+              'status': 'pending',
+              'created_at': DateTime.now().toIso8601String(),
+            });
+            debugPrint('SYNC: Re-queued patient $patientIdStr for self-healing upload.');
+            queuedAny = true;
+          }
+        }
+        if (queuedAny) {
+          _pendingSyncRequested = true;
+        }
       }
 
       final now = DateTime.now().toIso8601String();
@@ -402,7 +449,9 @@ class SyncManager extends ChangeNotifier {
   Map<String, dynamic> _patientRowToMap(Map<String, dynamic> row) {
     final createdAt = row['created_at'] as String? ?? '';
     final createdDt = DateTime.tryParse(createdAt) ?? DateTime.now();
-    final syncId = row['sync_id'] as String? ?? 'P${row['id']}';
+    final localId = row['id'] as int? ?? 0;
+    final fallbackSyncId = 'P${localId.toString().padLeft(3, '0')}';
+    final syncId = row['sync_id'] as String? ?? fallbackSyncId;
     return {
       'id': syncId,
       'name': row['full_name'],
@@ -418,12 +467,10 @@ class SyncManager extends ChangeNotifier {
     };
   }
 
-  Map<String, dynamic> _opdRowToMap(Map<String, dynamic> row) {
+  Map<String, dynamic> _opdRowToMap(Map<String, dynamic> row, String patientSyncId) {
     final createdAt = row['created_at'] as String? ?? '';
     final createdDt = DateTime.tryParse(createdAt) ?? DateTime.now();
     final visitDt = row['visit_datetime'] as String? ?? '';
-    final localPatientId = row['patient_id'] as int? ?? 0;
-    final patientSyncId = 'P$localPatientId';
     return {
       'id': row['opd_id']?.toString() ?? 'R${row['id']}',
       'patient_id': patientSyncId,

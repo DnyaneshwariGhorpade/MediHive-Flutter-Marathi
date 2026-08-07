@@ -305,6 +305,7 @@ final clinicId = prefs.getString('clinic_id') ?? '';
     required String deviceName,
     required String clinicId,
     String appVersion = '1.0.0',
+    String? fcmToken,
   }) async {
     await _loadToken();
     final res = await http.post(
@@ -315,6 +316,7 @@ final clinicId = prefs.getString('clinic_id') ?? '';
         'device_name': deviceName,
         'clinic_id': clinicId,
         'app_version': appVersion,
+        'fcm_token': fcmToken ?? '',
       }),
     ).timeout(const Duration(seconds: 10));
     return _handleResponse(res);
@@ -439,8 +441,10 @@ final clinicId = prefs.getString('clinic_id') ?? '';
     String opdId,
     List<File> images,
   ) async {
+    await _loadToken();
     final uri = Uri.parse('$baseUrl/sync/upload-images/$opdId');
     final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $_token';
 
     debugPrint('CLOUD IMAGE DEBUG: endpoint=$uri');
     debugPrint('CLOUD IMAGE DEBUG: file count=${images.length}');

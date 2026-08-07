@@ -238,7 +238,7 @@ class PatientProvider extends ChangeNotifier {
           'age': ageFromDob > 0 ? ageFromDob : existing['age'],
           'blood_group': formData.bloodGroup.isNotEmpty ? formData.bloodGroup : existing['blood_group'],
           'address': formData.address.isNotEmpty ? formData.address : existing['address'],
-          'weight': formData.weight != null ? formData.weight : existing['weight'],
+          'weight': formData.weight.isNotEmpty ? double.tryParse(formData.weight) : existing['weight'],
         };
         print('PATIENT ADD: updating patient id=${existing['id']} syncId=${formData.patientId}');
         print('PATIENT ADD: name="${updateData['full_name']}" gender="${updateData['gender']}" mobile="${updateData['mobile_number']}"');
@@ -280,7 +280,7 @@ class PatientProvider extends ChangeNotifier {
       'blood_group': formData.bloodGroup.isNotEmpty ? formData.bloodGroup : 'Not Specified',
       'address': formData.address.isEmpty ? 'Not specified' : formData.address,
       'created_at': DateTime.now().toIso8601String(),
-      'weight': formData.weight,
+      'weight': formData.weight.isNotEmpty ? double.tryParse(formData.weight) : null,
     });
 
     await _addSyncQueueEntry('patient', nextId);

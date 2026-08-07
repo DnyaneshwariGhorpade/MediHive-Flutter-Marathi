@@ -335,6 +335,8 @@ def _init_db():
         db.try_execute("ALTER TABLE opd_visits RENAME COLUMN follow_up_reason TO followup_status")
         db.try_execute("ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS image_links TEXT DEFAULT ''")
         db.try_execute("ALTER TABLE opd_visits DROP COLUMN IF EXISTS previous_visit_date")
+        db.try_execute("ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS blood_group TEXT DEFAULT ''")
+        db.try_execute("ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS panchakarma_notes TEXT DEFAULT ''")
 
         # Sync and role columns migration for users and appointments
         for col in ['device_id', 'sync_status', 'last_synced_at']:

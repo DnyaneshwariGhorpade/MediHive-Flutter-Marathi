@@ -23,28 +23,19 @@ from config.google_config import config as google_config
 from services.google_auth_service import GoogleAuthService
 
 
+from sheets_utils import _get_client, _open_spreadsheet
+
 def main() -> None:
-    sheet_id = google_config.sheet_id
-    if not sheet_id:
-        print("Error: GOOGLE_SHEET_ID is empty in .env", file=sys.stderr)
-        sys.exit(1)
-
-    auth = GoogleAuthService(google_config.token_path)
-    creds = auth.get_credentials()
-    if creds is None:
-        print(
-            f"Error: drive_token.json not found at {google_config.token_path}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     try:
-        service = build("sheets", "v4", credentials=creds)
-        sheet = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
-
-        print("Connection Successful")
-        print(f"Spreadsheet Title: {sheet.get('properties', {}).get('title')}")
-        print(f"Spreadsheet ID: {sheet.get('spreadsheetId')}")
+        client = _get_client()
+        spreadsheet = _open_spreadsheet(client)
+        if spreadsheet:
+            print("Connection Successful")
+            print(f"Spreadsheet Title: {spreadsheet.title}")
+            print(f"Spreadsheet ID: {spreadsheet.id}")
+        else:
+            print("Error: Could not open spreadsheet", file=sys.stderr)
+            sys.exit(1)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

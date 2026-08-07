@@ -67,6 +67,10 @@ def _init_settings_on_first_request():
         from services.settings_manager import settings_manager
         settings_manager.load()
         logger.info("Settings initialised at startup (lazy)")
+        
+        from services.sync_worker import start_worker
+        start_worker()
+        
         _initialised = True
 
 

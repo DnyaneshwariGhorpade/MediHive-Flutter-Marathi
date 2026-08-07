@@ -91,3 +91,38 @@ def _remove_token(token: str):
         logger.info("Removed stale FCM token from database")
     except Exception as e:
         logger.error("Failed to remove stale FCM token: %s", e)
+
+
+def send_silent_push_notification(token: str, data: dict = None):
+    if not FCM_SERVER_KEY:
+        logger.warning("FCM_SERVER_KEY not configured; skipping silent push notification")
+        return False
+
+    headers = {
+        "Authorization": f"key={FCM_SERVER_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    message = {
+        "to": token,
+        "data": {k: str(v) for k, v in (data or {}).items()},
+        "priority": "high",
+    }
+
+    try:
+        resp = requests.post(
+            "https://fcm.googleapis.com/fcm/send",
+            headers=headers,
+            data=json.dumps(message),
+            timeout=10,
+        )
+        result = resp.json()
+        if result.get("success", 0) == 1:
+            return True
+        if "InvalidRegistration" in str(result) or "NotRegistered" in str(result):
+            _remove_token(token)
+        logger.error(f"FCM silent send failed: {result}")
+        return False
+    except Exception as e:
+        logger.error(f"FCM silent request error: {e}")
+        return False

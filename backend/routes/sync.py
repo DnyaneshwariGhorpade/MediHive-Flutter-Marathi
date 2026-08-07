@@ -49,14 +49,15 @@ def _sync_opd_to_sheets(opd, image_links=None):
         )
         now = datetime.utcnow().isoformat()
         db = get_db()
+        clinic_id = opd.get('clinic_id', '')
         db.execute("""
             INSERT INTO patients
-                (id, name, mobile, gender, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
+                (id, full_name, mobile_number, gender, created_at, updated_at, clinic_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT DO NOTHING
         """, (
             patient_id, 'Unknown (Auto-created)',
-            '', 'Not Specified', now, now,
+            '', 'Not Specified', now, now, clinic_id,
         ))
         db.commit()
         db.close()
@@ -175,6 +176,9 @@ def sync_upload():
     results = {'patients': [], 'opd_records': [], 'appointments': []}
     sheet_sync_errors = []
     temp_id_map = {}
+    conflicts = []
+    missing_patients = []
+    events_to_enqueue = []
 
     # ── Patients (last-write-wins) ──
     for p in data.get('patients', []):
@@ -202,11 +206,14 @@ def sync_upload():
             if remote_updated >= local_updated:
                 Patient.update(p['id'], p, clinic_id=clinic_id)
                 results['patients'].append(_format_patient(Patient.get(p['id'], clinic_id=clinic_id)))
+                events_to_enqueue.append(('patient', p['id'], 'upsert'))
             else:
                 results['patients'].append(_format_patient(existing))
+                conflicts.append(f"Patient {p['id']} update skipped: local record is newer (local={local_updated}, remote={remote_updated})")
         else:
             Patient.create(p)
             results['patients'].append(_format_patient(Patient.get(p['id'], clinic_id=clinic_id)))
+            events_to_enqueue.append(('patient', p['id'], 'upsert'))
 
     # ── OPD Records (last-write-wins) ──
     for r in data.get('opd_records', []):
@@ -226,6 +233,8 @@ def sync_upload():
             r['next_visit_date'] = r['next_visit']
         if 'follow_up_reason' in r and 'followup_status' not in r:
             r['followup_status'] = r['follow_up_reason']
+        if 'opd_id' not in r or not r['opd_id']:
+            r['opd_id'] = r['id']
 
         pat_id = r.get('patient_id', '')
         if pat_id in temp_id_map:
@@ -238,20 +247,23 @@ def sync_upload():
             if remote_updated >= local_updated:
                 OPDRecord.update(r['id'], r, clinic_id=clinic_id)
                 result = OPDRecord.get(r['id'], clinic_id=clinic_id)
+                events_to_enqueue.append(('opd_visit', r['id'], 'upsert'))
             else:
                 result = existing
+                conflicts.append(f"OPD Visit {r['id']} update skipped: local record is newer (local={local_updated}, remote={remote_updated})")
         else:
             OPDRecord.create(r)
             result = OPDRecord.get(r['id'], clinic_id=clinic_id)
+            events_to_enqueue.append(('opd_visit', r['id'], 'upsert'))
 
         results['opd_records'].append(_format_opd(result))
-        try:
-            sheet_err = _sync_opd_to_sheets(result)
-            if sheet_err:
-                sheet_sync_errors.append({'opd_id': r.get('id'), 'error': sheet_err})
-        except Exception as e:
-            logger.warning("Sheet sync failed for OPD %s: %s", r.get('id'), e)
-            sheet_sync_errors.append({'opd_id': r.get('id'), 'error': str(e)})
+
+        # Check if referenced patient exists, if not, queue for self-healing
+        pat_id = r.get('patient_id', '')
+        if pat_id:
+            p_exist = Patient.get(pat_id, clinic_id=clinic_id)
+            if not p_exist and pat_id not in missing_patients:
+                missing_patients.append(pat_id)
 
     # ── Appointments (last-write-wins) ──
     for a in data.get('appointments', []):
@@ -260,6 +272,10 @@ def sync_upload():
         a['sync_status'] = 'synced'
         a['last_synced_at'] = now
 
+        pat_id = a.get('patient_id', '')
+        if pat_id in temp_id_map:
+            a['patient_id'] = temp_id_map[pat_id]
+
         existing = Appointment.get(a['id'], clinic_id=clinic_id)
         if existing:
             remote_updated = a.get('updated_at', '')
@@ -267,11 +283,21 @@ def sync_upload():
             if remote_updated >= local_updated:
                 Appointment.update(a['id'], a, clinic_id=clinic_id)
                 results['appointments'].append(Appointment.get(a['id'], clinic_id=clinic_id))
+                events_to_enqueue.append(('appointment', a['id'], 'upsert'))
             else:
                 results['appointments'].append(existing)
+                conflicts.append(f"Appointment {a['id']} update skipped: local record is newer (local={local_updated}, remote={remote_updated})")
         else:
             Appointment.create(a)
             results['appointments'].append(Appointment.get(a['id'], clinic_id=clinic_id))
+            events_to_enqueue.append(('appointment', a['id'], 'upsert'))
+
+        # Check if referenced patient exists, if not, queue for self-healing
+        pat_id = a.get('patient_id', '')
+        if pat_id:
+            p_exist = Patient.get(pat_id, clinic_id=clinic_id)
+            if not p_exist and pat_id not in missing_patients:
+                missing_patients.append(pat_id)
 
     # ── Deleted Entities ──
     for entry in data.get('deleted_entities', []):
@@ -280,12 +306,46 @@ def sync_upload():
         try:
             if etype == 'patient':
                 Patient.delete(eid, clinic_id=clinic_id)
+                events_to_enqueue.append((etype, eid, 'delete'))
             elif etype == 'opd_visit':
                 OPDRecord.delete(eid, clinic_id=clinic_id)
+                events_to_enqueue.append((etype, eid, 'delete'))
             elif etype == 'appointment':
                 Appointment.delete(eid, clinic_id=clinic_id)
+                events_to_enqueue.append((etype, eid, 'delete'))
         except Exception as exc:
             logger.warning("Delete sync failed for %s %s: %s", etype, eid, exc)
+
+    # ── Write sync log to cloud_sync_log ──
+    try:
+        db = get_db()
+        status_val = 'conflict' if conflicts else 'success'
+        err_msg = "; ".join(conflicts) if conflicts else ''
+        db.execute("""
+            INSERT INTO cloud_sync_log 
+                (clinic_id, device_id, direction, patients_count, opd_count, 
+                 appointments_count, deleted_count, status, error_message, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            clinic_id, device_id, 'upload',
+            len(data.get('patients', [])),
+            len(data.get('opd_records', [])),
+            len(data.get('appointments', [])),
+            len(data.get('deleted_entities', [])),
+            status_val, err_msg, now
+        ))
+        db.commit()
+        db.close()
+    except Exception as e:
+        logger.error("Failed to write cloud_sync_log: %s", e)
+
+    # ── Enqueue Sync Events to sync_queue for Background Worker ──
+    from services.sync_worker import enqueue_sync_event
+    for etype, eid, op in events_to_enqueue:
+        try:
+            enqueue_sync_event(etype, eid, operation=op, clinic_id=clinic_id, origin_device_id=device_id)
+        except Exception as e:
+            logger.error("Failed to enqueue event (%s, %s, %s): %s", etype, eid, op, e)
 
     response = {
         'results': results,
@@ -296,6 +356,10 @@ def sync_upload():
         response['temp_ids_mapped'] = temp_id_map
     if sheet_sync_errors:
         response['sheet_sync_errors'] = sheet_sync_errors
+    if conflicts:
+        response['conflicts'] = conflicts
+    if missing_patients:
+        response['missing_patients'] = missing_patients
 
     return jsonify(response), 200
 
@@ -401,74 +465,38 @@ def sync_upload_images(opd_id):
         logger.warning("No valid image files for OPD %s", opd_id)
         return jsonify({'error': 'No valid image files provided'}), 400
 
-    try:
-        visit_date = datetime.fromisoformat(opd.get('visit_datetime') or opd.get('visit_date', ''))
-    except (ValueError, TypeError):
-        visit_date = datetime.utcnow()
+    import tempfile
+    import shutil
 
-    from drive_utils import upload_image_fileobj_to_drive, upload_images_to_drive, check_existing_drive_files
+    local_upload_dir = os.path.join(tempfile.gettempdir(), f"medihive_uploads_{opd_id}")
+    if os.path.exists(local_upload_dir):
+        try:
+            shutil.rmtree(local_upload_dir)
+        except Exception:
+            pass
+    os.makedirs(local_upload_dir, exist_ok=True)
 
-    if IS_CLOUD:
-        logger.info("CLOUD MODE: uploading %d image(s) directly to Drive for OPD %s",
-                    len(files), opd_id)
-        drive_urls = []
-        for i, f in enumerate(files, 1):
-            url = upload_image_fileobj_to_drive(opd_id, f, i)
-            if url:
-                drive_urls.append(url)
-    else:
-        logger.info("LOCAL MODE: saving %d image(s) to disk for OPD %s", len(files), opd_id)
-        saved_paths = save_images_locally(opd_id, files)
+    for i, f in enumerate(files, 1):
+        filename = f.filename or f"image_{i}.jpg"
+        safe_filename = "".join(c for c in filename if c.isalnum() or c in "._-")
+        filepath = os.path.join(local_upload_dir, f"{i:02d}_{safe_filename}")
+        f.save(filepath)
 
-        drive_urls = check_existing_drive_files(opd_id, visit_date, len(saved_paths))
-        if not drive_urls:
-            image_records = [_ImageRecord(p) for p in saved_paths]
-            drive_urls = upload_images_to_drive(opd_id, image_records, visit_date)
+    device_id = request.headers.get('X-Device-ID') or request.form.get('device_id')
 
-    if not drive_urls:
-        logger.error("IMAGE UPLOAD FAILED: No Drive URLs generated for OPD %s", opd_id)
-        return jsonify({
-            'error': 'Image upload to Drive failed',
-            'opd_id': opd_id,
-            'image_count': 0,
-            'drive_urls': [],
-            'images_uploaded': False,
-        }), 500
+    from services.sync_worker import enqueue_sync_event
+    enqueue_sync_event('opd_visit', opd_id, operation='upload_images', clinic_id=clinic_id, origin_device_id=device_id)
 
-    urls_text = "\n".join(drive_urls)
-    OPDRecord.set_image_links(opd_id, urls_text, clinic_id=clinic_id)
-    logger.info("Image links persisted in DB for OPD %s: %s", opd_id, urls_text)
-
-    sheet_update_ok = True
-    sheet_error = None
-    try:
-        sheet_error = _sync_opd_to_sheets(opd, drive_urls)
-        if sheet_error:
-            logger.error("Sheet update FAILED for OPD %s: %s", opd_id, sheet_error)
-            sheet_update_ok = False
-        else:
-            logger.info("Google Sheet update SUCCESS for OPD %s", opd_id)
-    except Exception as e:
-        logger.error("Sheet update FAILED for OPD %s: %s", opd_id, e)
-        sheet_update_ok = False
-        sheet_error = str(e)
+    logger.info("Saved %d image(s) to temp directory for background sync upload: OPD=%s", len(files), opd_id)
 
     response = {
         'opd_id': opd_id,
-        'image_count': len(drive_urls),
-        'drive_urls': drive_urls,
-        'images_uploaded': True,
-        'sheet_updated': sheet_update_ok,
+        'image_count': len(files),
+        'drive_urls': [],
+        'images_uploaded': False,
+        'message': 'Images saved locally; background Google Drive and Google Sheet sync enqueued'
     }
-
-    if sheet_update_ok:
-        response['message'] = 'Images synced successfully'
-        return jsonify(response), 200
-    else:
-        response['message'] = 'Images uploaded to Drive, but Google Sheet was not updated.'
-        if sheet_error:
-            response['sheet_error_detail'] = sheet_error
-        return jsonify(response), 207
+    return jsonify(response), 200
 
 
 # ── Clinic Info ─────────────────────────────────────
@@ -490,3 +518,46 @@ def clinic_info():
         return jsonify({'error': 'Clinic not found'}), 404
 
     return jsonify({'error': 'No clinic assigned to this user'}), 404
+
+
+# ── One-Way Google Sheets Export ────────────────────
+
+@sync_bp.route('/export-sheets', methods=['POST'])
+@jwt_required()
+def export_sheets():
+    user_id = get_jwt_identity()
+    clinic_id = _get_user_clinic_id(user_id)
+    if not clinic_id:
+        return jsonify({'error': 'No clinic assigned to this user'}), 403
+
+    logger.info("SHEET EXPORT: starting bulk export for clinic %s", clinic_id)
+    
+    # Run in a background thread to return immediately
+    import threading
+    threading.Thread(target=_run_bulk_sheets_export, args=(clinic_id,)).start()
+    
+    return jsonify({'message': 'Bulk Google Sheets export started in background'}), 202
+
+
+def _run_bulk_sheets_export(clinic_id):
+    try:
+        from models.opd_record import OPDRecord
+        records = OPDRecord.full_restore(clinic_id)
+        logger.info("SHEET EXPORT: found %d records to export", len(records))
+        
+        success_count = 0
+        error_count = 0
+        
+        for r in records:
+            formatted = _format_opd(r)
+            err = _sync_opd_to_sheets(formatted)
+            if err:
+                logger.error("SHEET EXPORT ERROR for OPD %s: %s", r.get('id'), err)
+                error_count += 1
+            else:
+                success_count += 1
+                
+        logger.info("SHEET EXPORT COMPLETE: successfully exported %d/%d records (%d errors)", 
+                    success_count, len(records), error_count)
+    except Exception as e:
+        logger.error("SHEET EXPORT CRITICAL FAILED: %s", e)

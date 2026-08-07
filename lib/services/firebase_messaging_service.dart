@@ -4,6 +4,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'local_notification_service.dart';
 import 'api_service.dart';
+import 'sync_manager.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../models/appointment_model.dart';
 
 class FirebaseMessagingService {
   static final FirebaseMessagingService _instance = FirebaseMessagingService._internal();
@@ -92,6 +95,25 @@ class FirebaseMessagingService {
     final notification = message.notification;
     final data = message.data;
 
+    if (data['type'] == 'sync_trigger') {
+      final originDevice = data['origin_device_id'] ?? '';
+      debugPrint('FCM: Received silent sync_trigger from device: $originDevice');
+      
+      final localDeviceId = SyncManager().deviceId;
+      if (originDevice.isNotEmpty && originDevice == localDeviceId) {
+        debugPrint('FCM: Ignoring sync_trigger from ourselves');
+        return;
+      }
+      
+      try {
+        debugPrint('FCM: Forcing immediate sync pull...');
+        SyncManager().forceSyncNow();
+      } catch (e) {
+        debugPrint('FCM: Force sync pull failed: $e');
+      }
+      return;
+    }
+
     if (notification != null) {
       await LocalNotificationService().showNotification(
         id: message.hashCode,
@@ -122,6 +144,33 @@ Future<void> _backgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   final notification = message.notification;
   final data = message.data;
+
+  if (data['type'] == 'sync_trigger') {
+    final originDevice = data['origin_device_id'] ?? '';
+    debugPrint('FCM Background: Received silent sync_trigger from device: $originDevice');
+    
+    try {
+      if (!Hive.isBoxOpen('appointments')) {
+        await Hive.openBox<AppointmentModel>('appointments');
+      }
+      if (!Hive.isBoxOpen('drafts')) {
+        await Hive.openBox('drafts');
+      }
+      
+      final syncManager = SyncManager();
+      final localDeviceId = syncManager.deviceId;
+      if (originDevice.isNotEmpty && originDevice == localDeviceId) {
+        debugPrint('FCM Background: Ignoring sync_trigger from ourselves');
+        return;
+      }
+      
+      debugPrint('FCM Background: Forcing immediate background sync pull...');
+      await syncManager.forceSyncNow();
+    } catch (e) {
+      debugPrint('FCM Background: Background sync pull failed: $e');
+    }
+    return;
+  }
 
   final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');

@@ -544,7 +544,7 @@ class OpdProvider extends ChangeNotifier {
       case 'followUpReason':
         _formData.followUpReason = value;
       case 'weight':
-        _formData.weight = double.tryParse(value);
+        _formData.weight = value;
     }
     notifyListeners();
     autoSaveDraft();

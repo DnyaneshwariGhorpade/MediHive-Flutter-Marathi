@@ -1,7 +1,9 @@
 import os
+from dotenv import load_dotenv
 import tempfile
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 IS_CLOUD = os.environ.get('MEDIHIVE_CLOUD', '').lower() in ('1', 'true', 'yes')
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'medihive-secret-key-change-in-production')

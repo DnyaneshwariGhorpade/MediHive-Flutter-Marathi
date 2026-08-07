@@ -11,7 +11,7 @@ import '../../services/sync_manager.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/standard_header.dart';
 import '../../l10n/app_localizations.dart';
-
+import '../../widgets/medi_date_picker_field.dart';
 class PatientEditScreen extends StatefulWidget {
   final String patientId;
   const PatientEditScreen({super.key, required this.patientId});
@@ -204,7 +204,27 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
                             _buildField(l10n.fullName, _nameController, Icons.person_outline, validator: (v) =>
                                 v == null || v.trim().isEmpty ? l10n.nameRequired : null),
                             const SizedBox(height: 16),
-                            _buildField(l10n.age, _ageController, Icons.cake_outlined, keyboardType: TextInputType.number),
+                            _buildField(
+                              l10n.age,
+                              _ageController,
+                              Icons.cake_outlined,
+                              keyboardType: TextInputType.number,
+                              onChanged: (val) {
+                                final ageText = val.trim();
+                                if (ageText.isNotEmpty) {
+                                  final age = int.tryParse(ageText);
+                                  if (age != null && age >= 0 && age <= 120) {
+                                    final calculatedYear = DateTime.now().year - age;
+                                    final newDob = "$calculatedYear-01-01";
+                                    if (_dobController.text != newDob) {
+                                      setState(() {
+                                        _dobController.text = newDob;
+                                      });
+                                    }
+                                  }
+                                }
+                              },
+                            ),
                             const SizedBox(height: 16),
                             _buildDropdown(l10n.gender, _gender, _genders, (v) => setState(() => _gender = v!)),
                             const SizedBox(height: 16),
@@ -217,7 +237,28 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
                             const SizedBox(height: 16),
                             _buildField(l10n.address, _addressController, Icons.location_on_outlined, maxLines: 2),
                             const SizedBox(height: 16),
-                            _buildField(l10n.dateOfBirthLabel, _dobController, Icons.calendar_today_outlined),
+                            MediDatePickerField(
+                              label: l10n.dateOfBirthLabel,
+                              value: _dobController.text.trim(),
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime.now(),
+                              onChanged: (isoDate) {
+                                setState(() {
+                                  _dobController.text = isoDate;
+                                  final date = DateTime.tryParse(isoDate);
+                                  if (date != null) {
+                                    final now = DateTime.now();
+                                    int age = now.year - date.year;
+                                    if (now.month < date.month || (now.month == date.month && now.day < date.day)) {
+                                      age--;
+                                    }
+                                    if (age >= 0) {
+                                      _ageController.text = age.toString();
+                                    }
+                                  }
+                                });
+                              },
+                            ),
                             const SizedBox(height: 16),
                             _buildDropdown(l10n.bloodGroup, _bloodGroup, _bloodGroups, (v) => setState(() => _bloodGroup = v!)),
                             const SizedBox(height: 16),
@@ -283,12 +324,14 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
     TextInputType? keyboardType,
     int maxLines = 1,
     String? Function(String?)? validator,
+    ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
+      onChanged: onChanged,
       style: AppTheme.body,
       decoration: InputDecoration(
         labelText: label,
