@@ -407,6 +407,17 @@ def _init_db():
         default_clinic_id = 'CLIDEFAULT001'
         now_iso = datetime.utcnow().isoformat()
         db.execute("""
+            CREATE TABLE IF NOT EXISTS clinics (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                email       TEXT DEFAULT '',
+                phone       TEXT DEFAULT '',
+                address     TEXT DEFAULT '',
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL
+            );
+        """)
+        db.execute("""
             INSERT INTO clinics (id, name, email, phone, address, created_at, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO NOTHING
@@ -486,17 +497,6 @@ def _init_db():
             CREATE TABLE IF NOT EXISTS settings (
                 key         TEXT PRIMARY KEY,
                 value       TEXT NOT NULL
-            );
-        """)
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS clinics (
-                id          TEXT PRIMARY KEY,
-                name        TEXT NOT NULL,
-                email       TEXT DEFAULT '',
-                phone       TEXT DEFAULT '',
-                address     TEXT DEFAULT '',
-                created_at  TEXT NOT NULL,
-                updated_at  TEXT NOT NULL
             );
         """)
         db.execute("""
