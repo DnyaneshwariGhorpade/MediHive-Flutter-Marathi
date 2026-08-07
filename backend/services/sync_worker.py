@@ -205,6 +205,14 @@ class SyncWorkerThread(threading.Thread):
                     logger.info("SyncWorker: Propagating patient %s updates to Sheets", entity_id)
                     patient = Patient.get(entity_id, clinic_id=clinic_id)
                     if patient:
+                        db = get_db()
+                        opd_rows = db.execute(
+                            "SELECT id FROM opd_visits WHERE patient_id = %s AND clinic_id = %s",
+                            (entity_id, clinic_id)
+                        ).fetchall()
+                        db.close()
+                        opd_ids = {r['id'] for r in opd_rows}
+
                         client = _get_client()
                         ws = _get_opd_worksheet(client)
                         records = ws.get_all_values()
@@ -212,11 +220,14 @@ class SyncWorkerThread(threading.Thread):
                         for i, existing_row in enumerate(records):
                             if i == 0:
                                 continue
-                            if len(existing_row) > 1 and existing_row[1] == entity_id:
+                            row_opd_id = existing_row[0] if len(existing_row) > 0 else ''
+                            row_patient_id = existing_row[1] if len(existing_row) > 1 else ''
+                            if row_patient_id == entity_id or (row_opd_id and row_opd_id in opd_ids):
                                 sheet_row = i + 1
                                 ws.update(
-                                    range_name=f"C{sheet_row}:J{sheet_row}",
+                                    range_name=f"B{sheet_row}:J{sheet_row}",
                                     values=[[
+                                        entity_id,
                                         _fmt(patient.get('full_name') or patient.get('name', '')),
                                         _fmt(patient.get('mobile_number') or patient.get('mobile', '')),
                                         _fmt(patient.get('gender', '')),

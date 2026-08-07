@@ -12,6 +12,8 @@ from models.appointment import Appointment
 from models.deleted_entity import DeletedEntity
 from models.clinic import Clinic
 from models.device_registry import DeviceRegistry
+import os
+import tempfile
 from database import get_db
 from datetime import datetime
 from pathlib import Path
