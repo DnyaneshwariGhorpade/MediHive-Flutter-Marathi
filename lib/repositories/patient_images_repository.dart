@@ -92,6 +92,17 @@ class PatientImagesRepository {
     return db.delete(tablePatientImages, where: 'opd_visit_id = ?', whereArgs: [opdVisitId]);
   }
 
+  Future<int> deleteByPatientId(int patientId) async {
+    final db = await _db;
+    return db.delete(tablePatientImages, where: 'patient_id = ?', whereArgs: [patientId]);
+  }
+
+  Future<int> getMaxId() async {
+    final db = await _db;
+    final result = await db.rawQuery('SELECT COALESCE(MAX(id), 0) AS max_id FROM $tablePatientImages');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   Future<int> count() async {
     final db = await _db;
     final result = await db.rawQuery('SELECT COUNT(*) AS cnt FROM $tablePatientImages');

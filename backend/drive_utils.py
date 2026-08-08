@@ -146,7 +146,7 @@ def upload_images_to_drive(opd_id, image_records, visit_date):
             ).execute()
             logger.info("DRIVE_UPLOAD: Public permission set for file_id=%s", file_id)
 
-            public_url = f"https://drive.google.com/file/d/{file_id}/view"
+            public_url = f"https://drive.google.com/uc?export=view&id={file_id}"
             uploaded_links.append(public_url)
 
             logger.info("DRIVE_UPLOAD: SUCCESS: index=%d name=%s url=%s", idx, safe_name, public_url)
@@ -217,6 +217,6 @@ def upload_image_fileobj_to_drive(opd_id, file_storage, index):
         logger.error("DRIVE_UPLOAD_FILEOBJ: Permission set FAILED for file_id=%s: %s", file_id, e)
         raise
 
-    public_url = f"https://drive.google.com/file/d/{file_id}/view"
+    public_url = f"https://drive.google.com/uc?export=view&id={file_id}"
     logger.info("DRIVE_UPLOAD_FILEOBJ: COMPLETE: OPD=%s index=%d url=%s", opd_id, index, public_url)
     return public_url

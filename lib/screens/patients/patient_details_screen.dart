@@ -15,8 +15,11 @@ import '../../providers/settings_provider.dart';
 import '../../repositories/patient_repository.dart';
 import '../../repositories/opd_record_repository.dart';
 import '../../repositories/patient_images_repository.dart';
+import '../../repositories/sync_queue_repository.dart';
+import '../../utils/sync_id_generator.dart';
 import '../../widgets/standard_header.dart';
 import '../../services/cloud_sync_manager.dart';
+import '../../services/sync_manager.dart';
 import '../../services/prescription_pdf_service.dart';
 import '../../services/whatsapp_share_helper.dart';
 import '../../utils/helpers.dart';
@@ -206,6 +209,35 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
 
     // Delete from SQLite
     await opdRepo.delete(localId);
+
+    // Enqueue cloud deletes (opd_visit + its follow-up appointment)
+    final syncQueueRepo = SyncQueueRepository();
+    try {
+      await syncQueueRepo.insert({
+        'id': SyncIdGenerator.nextId(),
+        'entity_type': 'opd_visit',
+        'entity_id': opdId,
+        'operation': 'delete',
+        'status': 'pending',
+        'retry_count': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+    final nextVisitDate = localRow['next_visit_date']?.toString() ?? '';
+    if (nextVisitDate.isNotEmpty) {
+      try {
+        await syncQueueRepo.insert({
+          'id': SyncIdGenerator.nextId(),
+          'entity_type': 'appointment',
+          'entity_id': 'followup_${opdId}_$nextVisitDate',
+          'operation': 'delete',
+          'status': 'pending',
+          'retry_count': 0,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
+    }
+    SyncManager().forceSyncNow();
 
     // Notify cloud sync
     CloudSyncManager().notifyChange(

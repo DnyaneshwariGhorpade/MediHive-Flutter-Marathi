@@ -50,6 +50,7 @@ app.*.map.json
 # Google credentials and tokens (secrets - never commit)
 credentials/
 drive_token.json
+drive_token.json.bak
 oauth_credentials.json
 
 # Backend database and local images

@@ -391,8 +391,9 @@ class SyncManager extends ChangeNotifier {
           existing?['updated_at'] as String? ?? existing?['created_at'] as String? ?? '',
         );
 
+        final localId = existing != null ? existing['id'] as int : (await _opdRepo.getMaxId()) + 1;
+
         if (existing == null || (remoteUpdated != null && localUpdated != null && remoteUpdated.isAfter(localUpdated))) {
-          final localId = existing != null ? existing['id'] as int : (await _opdRepo.getMaxId()) + 1;
           final row = await _remoteOpdToRow(map, localId);
           if (existing != null) {
             await _opdRepo.update(localId, row);
@@ -401,9 +402,71 @@ class SyncManager extends ChangeNotifier {
           }
           applied++;
         }
+
+        await _syncRemoteOpdImages(map, localId);
       } catch (_) {}
     }
     return applied;
+  }
+
+  /// Populate the local `patient_images` table from the remote OPD row's
+  /// `image_links` (newline-separated Google Drive URLs). Idempotent:
+  /// URLs already present for the OPD are skipped.
+  Future<void> _syncRemoteOpdImages(Map<String, dynamic> remoteOpd, int localOpdId) async {
+    try {
+      final linksText = remoteOpd['image_links']?.toString() ?? '';
+      if (linksText.trim().isEmpty) return;
+
+      final remotePatientId = remoteOpd['patient_id']?.toString() ?? '';
+      int localPatientId = 0;
+      if (remotePatientId.isNotEmpty) {
+        try {
+          final patient = await _patientRepo.getBySyncId(remotePatientId);
+          localPatientId = patient?['id'] as int? ?? 0;
+        } catch (_) {}
+      }
+
+      final existing = await _imagesRepo.getByOpdVisitId(localOpdId);
+      final existingUrls = existing
+          .map((r) => _normalizeDriveUrl(r['drive_url']?.toString() ?? ''))
+          .where((u) => u.isNotEmpty)
+          .toSet();
+
+      var nextId = await _imagesRepo.getMaxId();
+      for (final link in linksText.split('\n')) {
+        final trimmed = link.trim();
+        if (trimmed.isEmpty) continue;
+        final url = _normalizeDriveUrl(trimmed);
+        if (url.isEmpty || existingUrls.contains(url)) continue;
+        nextId++;
+        await _imagesRepo.insert({
+          'id': nextId,
+          'patient_id': localPatientId,
+          'opd_visit_id': localOpdId,
+          'file_path': null,
+          'image_type': 'document',
+          'sync_status': 'synced',
+          'uploaded_at': DateTime.now().toIso8601String(),
+          'created_at': DateTime.now().toIso8601String(),
+          'drive_url': url,
+        });
+      }
+    } catch (e) {
+      debugPrint('SYNC image link apply failed: $e');
+    }
+  }
+
+  /// Convert a Google Drive share URL to a directly loadable image URL.
+  /// e.g. https://drive.google.com/file/d/ID/view -> https://drive.google.com/uc?export=view&id=ID
+  String _normalizeDriveUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return '';
+    final fileIdMatch = RegExp(r'/file/d/([^/]+)').firstMatch(trimmed);
+    if (fileIdMatch != null) {
+      final fileId = fileIdMatch.group(1)!;
+      return 'https://drive.google.com/uc?export=view&id=$fileId';
+    }
+    return trimmed;
   }
 
   Future<int> _applyRemoteAppointments(List<dynamic> remoteAppts) async {
@@ -416,7 +479,7 @@ class SyncManager extends ChangeNotifier {
         final remoteUpdated = DateTime.tryParse(map['updated_at']?.toString() ?? '');
         if (existing == null ||
             (remoteUpdated != null && existing.updatedAt.isBefore(remoteUpdated))) {
-          apptBox.put(map['id'], AppointmentModel.fromJson(map));
+          apptBox.put(map['id'], AppointmentModel.fromJson(map).copyWith(isSynced: true));
           applied++;
         }
       } catch (_) {}
@@ -437,12 +500,14 @@ class SyncManager extends ChangeNotifier {
           if (local != null) {
             final localId = local['id'] as int;
             await _opdRepo.deleteByPatientId(localId);
+            await _imagesRepo.deleteByPatientId(localId);
             await _patientRepo.delete(localId);
             applied++;
           }
         } else if (etype == 'opd_visit') {
           final local = await _opdRepo.getByOpdId(eid);
           if (local != null) {
+            await _imagesRepo.deleteByOpdVisitId(local['id'] as int);
             await _opdRepo.delete(local['id'] as int);
             applied++;
           }
@@ -553,6 +618,7 @@ class SyncManager extends ChangeNotifier {
       'gender': row['gender'] ?? 'Not Specified',
       'blood_group': row['blood_group'] ?? 'Not Specified',
       'mobile': row['mobile_number'],
+      'alternate_mobile': row['alternate_mobile'] ?? '',
       'address': row['address'] ?? '',
       'created_at': createdDt.toIso8601String(),
       'updated_at': _resolveUpdatedAt(row),
@@ -597,6 +663,7 @@ class SyncManager extends ChangeNotifier {
       'sync_id': syncId,
       'full_name': remote['name']?.toString() ?? '',
       'mobile_number': remote['mobile']?.toString() ?? '',
+      'alternate_mobile': remote['alternate_mobile']?.toString() ?? '',
       'gender': remote['gender']?.toString() ?? 'Not Specified',
       'dob': remote['dob']?.toString() ?? '',
       'age': int.tryParse(remote['age']?.toString() ?? '') ?? 0,

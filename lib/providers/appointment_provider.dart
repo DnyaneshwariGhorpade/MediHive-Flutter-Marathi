@@ -318,6 +318,21 @@ class AppointmentProvider extends ChangeNotifier {
       final box = Hive.box<AppointmentModel>('appointments');
       box.delete(id);
     } catch (_) {}
+    try {
+      final syncQueueRepo = SyncQueueRepository();
+      syncQueueRepo.insert({
+        'id': SyncIdGenerator.nextId(),
+        'entity_type': 'appointment',
+        'entity_id': id,
+        'operation': 'delete',
+        'status': 'pending',
+        'retry_count': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      Future.microtask(() {
+        SyncManager().forceSyncNow();
+      });
+    } catch (_) {}
     notifyListeners();
   }
 
