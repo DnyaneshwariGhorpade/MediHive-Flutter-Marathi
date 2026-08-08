@@ -64,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     final sync = CloudSyncManager();
     if (sync.syncCount > _lastSyncCount) {
       _lastSyncCount = sync.syncCount;
-      if (mounted) {
+      if (sync.lastSyncApplied > 0 && mounted) {
         context.read<DashboardProvider>().loadDashboardData();
       }
     }

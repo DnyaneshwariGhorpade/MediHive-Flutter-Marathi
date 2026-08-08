@@ -48,13 +48,16 @@ class SyncManager extends ChangeNotifier {
   bool _pendingSyncRequested = false;
   Timer? _debounceTimer;
   Timer? _pollTimer;
+  Timer? _forceDebounce;
   StreamSubscription<bool>? _connectivitySubscription;
   int _syncCount = 0;
+  int _lastSyncApplied = 0;
   String? _deviceId;
 
   SyncState get syncState => _syncState;
   bool get isSyncing => _syncState == SyncState.syncing;
   int get syncCount => _syncCount;
+  int get lastSyncApplied => _lastSyncApplied;
   String? get deviceId => _deviceId;
 
   static final SyncManager _instance = SyncManager._internal();
@@ -209,6 +212,15 @@ class SyncManager extends ChangeNotifier {
       }
     } catch (_) {}
 
+    final pushCount = pushPatients.length +
+        pushOpd.length +
+        pushAppts.length +
+        deletedEntities.length +
+        pushSettings.length +
+        pushNotes.length +
+        pushMedicines.length +
+        pushSymptoms.length;
+
     if (pushPatients.isNotEmpty || pushOpd.isNotEmpty || pushAppts.isNotEmpty || deletedEntities.isNotEmpty || pushSettings.isNotEmpty || pushNotes.isNotEmpty || pushMedicines.isNotEmpty || pushSymptoms.isNotEmpty) {
       debugPrint('SYNC PUSHING to backend...');
       final response = await ApiService.syncPush(
@@ -296,14 +308,16 @@ class SyncManager extends ChangeNotifier {
     try {
       final data = await ApiService.syncPull(pullSync);
 
-      await _applyRemotePatients(data['patients'] as List<dynamic>? ?? []);
-      await _applyRemoteOpdRecords(data['opd_records'] as List<dynamic>? ?? []);
-      await _applyRemoteAppointments(data['appointments'] as List<dynamic>? ?? []);
-      await _applyRemoteClinicSettings(data['clinic_settings'] as List<dynamic>? ?? []);
-      await _applyRemoteCalendarNotes(data['calendar_notes'] as List<dynamic>? ?? []);
-      await _applyRemoteMedicines(data['medicines'] as List<dynamic>? ?? []);
-      await _applyRemoteSymptoms(data['symptoms'] as List<dynamic>? ?? []);
-      await _applyRemoteDeletes(data['deleted_entities'] as List<dynamic>? ?? []);
+      final pullApplied =
+          await _applyRemotePatients(data['patients'] as List<dynamic>? ?? []) +
+              await _applyRemoteOpdRecords(data['opd_records'] as List<dynamic>? ?? []) +
+              await _applyRemoteAppointments(data['appointments'] as List<dynamic>? ?? []) +
+              await _applyRemoteClinicSettings(data['clinic_settings'] as List<dynamic>? ?? []) +
+              await _applyRemoteCalendarNotes(data['calendar_notes'] as List<dynamic>? ?? []) +
+              await _applyRemoteMedicines(data['medicines'] as List<dynamic>? ?? []) +
+              await _applyRemoteSymptoms(data['symptoms'] as List<dynamic>? ?? []) +
+              await _applyRemoteDeletes(data['deleted_entities'] as List<dynamic>? ?? []);
+      _lastSyncApplied = pushCount + pullApplied;
 
       await prefs.setString(
         'last_flask_sync',
@@ -339,7 +353,8 @@ class SyncManager extends ChangeNotifier {
     }
   }
 
-  Future<void> _applyRemotePatients(List<dynamic> remotePatients) async {
+  Future<int> _applyRemotePatients(List<dynamic> remotePatients) async {
+    var applied = 0;
     for (final json in remotePatients) {
       try {
         final map = Map<String, dynamic>.from(json as Map);
@@ -357,12 +372,15 @@ class SyncManager extends ChangeNotifier {
             final maxId = await _patientRepo.getMaxId();
             await _patientRepo.insert(_remotePatientToRow(map, maxId + 1, remoteId));
           }
+          applied++;
         }
       } catch (_) {}
     }
+    return applied;
   }
 
-  Future<void> _applyRemoteOpdRecords(List<dynamic> remoteOpd) async {
+  Future<int> _applyRemoteOpdRecords(List<dynamic> remoteOpd) async {
+    var applied = 0;
     for (final json in remoteOpd) {
       try {
         final map = Map<String, dynamic>.from(json as Map);
@@ -381,12 +399,15 @@ class SyncManager extends ChangeNotifier {
           } else {
             await _opdRepo.insert(row);
           }
+          applied++;
         }
       } catch (_) {}
     }
+    return applied;
   }
 
-  Future<void> _applyRemoteAppointments(List<dynamic> remoteAppts) async {
+  Future<int> _applyRemoteAppointments(List<dynamic> remoteAppts) async {
+    var applied = 0;
     for (final json in remoteAppts) {
       try {
         final map = Map<String, dynamic>.from(json as Map);
@@ -396,12 +417,15 @@ class SyncManager extends ChangeNotifier {
         if (existing == null ||
             (remoteUpdated != null && existing.updatedAt.isBefore(remoteUpdated))) {
           apptBox.put(map['id'], AppointmentModel.fromJson(map));
+          applied++;
         }
       } catch (_) {}
     }
+    return applied;
   }
 
-  Future<void> _applyRemoteDeletes(List<dynamic> remoteDeleted) async {
+  Future<int> _applyRemoteDeletes(List<dynamic> remoteDeleted) async {
+    var applied = 0;
     for (final del in remoteDeleted) {
       try {
         final d = Map<String, dynamic>.from(del as Map);
@@ -414,22 +438,29 @@ class SyncManager extends ChangeNotifier {
             final localId = local['id'] as int;
             await _opdRepo.deleteByPatientId(localId);
             await _patientRepo.delete(localId);
+            applied++;
           }
         } else if (etype == 'opd_visit') {
           final local = await _opdRepo.getByOpdId(eid);
           if (local != null) {
             await _opdRepo.delete(local['id'] as int);
+            applied++;
           }
         } else if (etype == 'appointment') {
           try {
             final apptBox = Hive.box<AppointmentModel>('appointments');
-            if (apptBox.containsKey(eid)) await apptBox.delete(eid);
+            if (apptBox.containsKey(eid)) {
+              await apptBox.delete(eid);
+              applied++;
+            }
           } catch (_) {}
         } else if (etype == 'calendar_note') {
           await _notesRepo.deleteByDate(eid);
+          applied++;
         }
       } catch (_) {}
     }
+    return applied;
   }
 
   Future<void> forceSyncNow() async {
@@ -437,16 +468,29 @@ class SyncManager extends ChangeNotifier {
       _pendingSyncRequested = true;
       return;
     }
-    await _trySync();
+    _forceDebounce?.cancel();
+    _forceDebounce = Timer(const Duration(milliseconds: 1500), () async {
+      await _trySync();
+    });
   }
 
   Future<bool> triggerManualSync() async {
-    await forceSyncNow();
+    if (_syncState == SyncState.syncing) {
+      _pendingSyncRequested = true;
+      return false;
+    }
+    _forceDebounce?.cancel();
+    await _trySync();
     return _syncState == SyncState.synced;
   }
 
   Future<bool> backupToDriveOnly() async {
-    await forceSyncNow();
+    if (_syncState == SyncState.syncing) {
+      _pendingSyncRequested = true;
+      return false;
+    }
+    _forceDebounce?.cancel();
+    await _trySync();
     return _syncState == SyncState.synced;
   }
 
@@ -468,13 +512,14 @@ class SyncManager extends ChangeNotifier {
     try {
       await ApiService.ensureToken();
       final data = await ApiService.fullRestore();
-      await _applyRemotePatients(data['patients'] as List<dynamic>? ?? []);
-      await _applyRemoteOpdRecords(data['opd_records'] as List<dynamic>? ?? []);
-      await _applyRemoteAppointments(data['appointments'] as List<dynamic>? ?? []);
-      await _applyRemoteClinicSettings(data['clinic_settings'] as List<dynamic>? ?? []);
-      await _applyRemoteCalendarNotes(data['calendar_notes'] as List<dynamic>? ?? []);
-      await _applyRemoteMedicines(data['medicines'] as List<dynamic>? ?? []);
-      await _applyRemoteSymptoms(data['symptoms'] as List<dynamic>? ?? []);
+      _lastSyncApplied =
+          await _applyRemotePatients(data['patients'] as List<dynamic>? ?? []) +
+              await _applyRemoteOpdRecords(data['opd_records'] as List<dynamic>? ?? []) +
+              await _applyRemoteAppointments(data['appointments'] as List<dynamic>? ?? []) +
+              await _applyRemoteClinicSettings(data['clinic_settings'] as List<dynamic>? ?? []) +
+              await _applyRemoteCalendarNotes(data['calendar_notes'] as List<dynamic>? ?? []) +
+              await _applyRemoteMedicines(data['medicines'] as List<dynamic>? ?? []) +
+              await _applyRemoteSymptoms(data['symptoms'] as List<dynamic>? ?? []);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
@@ -623,7 +668,8 @@ class SyncManager extends ChangeNotifier {
     }
   }
 
-  Future<void> _applyRemoteClinicSettings(List<dynamic> remoteSettings) async {
+  Future<int> _applyRemoteClinicSettings(List<dynamic> remoteSettings) async {
+    var applied = 0;
     for (final json in remoteSettings) {
       try {
         final map = Map<String, dynamic>.from(json as Map);
@@ -646,12 +692,15 @@ class SyncManager extends ChangeNotifier {
             'operating_hours': map['operating_hours']?.toString() ?? '',
             'updated_at': map['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
           });
+          applied++;
         }
       } catch (_) {}
     }
+    return applied;
   }
 
-  Future<void> _applyRemoteCalendarNotes(List<dynamic> remoteNotes) async {
+  Future<int> _applyRemoteCalendarNotes(List<dynamic> remoteNotes) async {
+    var applied = 0;
     for (final json in remoteNotes) {
       try {
         final map = Map<String, dynamic>.from(json as Map);
@@ -682,12 +731,15 @@ class SyncManager extends ChangeNotifier {
               });
             }
           }
+          applied++;
         }
       } catch (_) {}
     }
+    return applied;
   }
 
-  Future<void> _applyRemoteMedicines(List<dynamic> remoteMedicines) async {
+  Future<int> _applyRemoteMedicines(List<dynamic> remoteMedicines) async {
+    var applied = 0;
     for (final json in remoteMedicines) {
       try {
         final map = Map<String, dynamic>.from(json as Map);
@@ -697,12 +749,15 @@ class SyncManager extends ChangeNotifier {
         if (existing == null) {
           final maxId = await _medicinesRepo.getMaxId();
           await _medicinesRepo.insert({'id': maxId + 1, 'name': name});
+          applied++;
         }
       } catch (_) {}
     }
+    return applied;
   }
 
-  Future<void> _applyRemoteSymptoms(List<dynamic> remoteSymptoms) async {
+  Future<int> _applyRemoteSymptoms(List<dynamic> remoteSymptoms) async {
+    var applied = 0;
     for (final json in remoteSymptoms) {
       try {
         final map = Map<String, dynamic>.from(json as Map);
@@ -711,9 +766,11 @@ class SyncManager extends ChangeNotifier {
         final existing = await _symptomsRepo.getByName(name);
         if (existing == null) {
           await _symptomsRepo.insert({'name': name});
+          applied++;
         }
       } catch (_) {}
     }
+    return applied;
   }
 
   @override
@@ -721,6 +778,7 @@ class SyncManager extends ChangeNotifier {
     _connectivitySubscription?.cancel();
     _debounceTimer?.cancel();
     _pollTimer?.cancel();
+    _forceDebounce?.cancel();
     super.dispose();
   }
 }

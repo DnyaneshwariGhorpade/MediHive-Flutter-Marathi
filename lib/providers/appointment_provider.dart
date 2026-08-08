@@ -92,14 +92,15 @@ class AppointmentProvider extends ChangeNotifier {
     _loadingHive = true;
     try {
       final box = Hive.box<AppointmentModel>('appointments');
+      final nameMap = await PatientRepository().getSyncIdNameMap();
       final temp = <Appointment>[];
       for (final m in box.values) {
-        final patientName = await _patientNameFromId(m.patientId);
+        final name = nameMap[m.patientId];
         temp.add(Appointment(
           id: m.id,
           dateTime: m.dateTime,
           type: m.notes == 'Follow-up' ? 'Follow-up' : 'Consultation',
-          patient: patientName,
+          patient: (name == null || name.isEmpty) ? m.patientId : name,
           time: '${m.dateTime.hour.toString().padLeft(2, '0')}:${m.dateTime.minute.toString().padLeft(2, '0')}',
         ));
       }
@@ -113,17 +114,6 @@ class AppointmentProvider extends ChangeNotifier {
       _needsReload = false;
       _loadFromHive();
     }
-  }
-
-  Future<String> _patientNameFromId(String patientId) async {
-    try {
-      final patient = await PatientRepository().getBySyncId(patientId);
-      if (patient != null) {
-        final name = patient['full_name'] as String?;
-        if (name != null && name.isNotEmpty) return name;
-      }
-    } catch (_) {}
-    return patientId;
   }
 
   List<Appointment> get appointments => _appointments;

@@ -1,11 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'api_service.dart';
 import 'sync_manager.dart';
-import 'firebase_messaging_service.dart';
-import '../repositories/device_registration_repository.dart';
-import 'dart:math' show Random;
 
 enum CloudSyncState {
   idle,
@@ -18,13 +13,10 @@ enum CloudSyncState {
 
 class CloudSyncManager extends ChangeNotifier {
   CloudSyncState _state = CloudSyncState.idle;
-  Timer? _heartbeatTimer;
   bool _isRunning = false;
   int _syncCount = 0;
-  String _lastError = '';
-  String? _deviceId;
+  final String _lastError = '';
 
-  final DeviceRegistrationRepository _deviceRegRepo = DeviceRegistrationRepository();
   final SyncManager _syncManager = SyncManager();
 
   static final CloudSyncManager _instance = CloudSyncManager._internal();
@@ -36,7 +28,7 @@ class CloudSyncManager extends ChangeNotifier {
   bool get isConfigured => _cloudBaseUrl.isNotEmpty;
   String get lastError => _lastError;
   int get syncCount => _syncCount;
-  String? get deviceId => _deviceId;
+  int get lastSyncApplied => _syncManager.lastSyncApplied;
 
   static String get _cloudBaseUrl =>
       ''; // Backward compat: cloud URLs now hit same Flask backend
@@ -45,27 +37,13 @@ class CloudSyncManager extends ChangeNotifier {
     if (_isRunning) return;
     _isRunning = true;
 
-    try {
-      _deviceId = await _loadOrCreateDeviceId();
-    } catch (e) {
-      _isRunning = false;
-      _state = CloudSyncState.error;
-      notifyListeners();
-      return;
-    }
-
-    // Register device
-    await _registerDevice();
-
-    // Heartbeat every 5 minutes
-    _heartbeatTimer = Timer.periodic(const Duration(minutes: 5), (_) => _sendHeartbeat());
-
-    // Listen to SyncManager state
+    // Listen to SyncManager state (single source of sync status; no
+    // separate heartbeat/registration needed here).
     _syncManager.addListener(_onSyncStateChange);
 
     _state = CloudSyncState.idle;
     notifyListeners();
-    debugPrint('CLOUD SYNC: started device=$_deviceId');
+    debugPrint('CLOUD SYNC: started');
   }
 
   void _onSyncStateChange() {
@@ -85,8 +63,6 @@ class CloudSyncManager extends ChangeNotifier {
 
   void stop() {
     _isRunning = false;
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = null;
     _syncManager.removeListener(_onSyncStateChange);
     _state = CloudSyncState.idle;
     notifyListeners();
@@ -104,52 +80,6 @@ class CloudSyncManager extends ChangeNotifier {
 
   Future<void> forceSync() async {
     await _syncManager.forceSyncNow();
-  }
-
-  Future<void> _registerDevice() async {
-    if (_deviceId == null) return;
-    try {
-      final fcmToken = FirebaseMessagingService().fcmToken;
-      await ApiService.cloudRegisterDevice(
-        deviceId: _deviceId!,
-        deviceName: await _getDeviceName(),
-        clinicId: '',
-        appVersion: _getAppVersion(),
-        fcmToken: fcmToken,
-      );
-    } catch (_) {}
-  }
-
-  Future<void> _sendHeartbeat() async {
-    if (_deviceId == null) return;
-    try {
-      await ApiService.cloudHeartbeat(deviceId: _deviceId!);
-    } catch (_) {}
-  }
-
-  Future<String> _loadOrCreateDeviceId() async {
-    final existing = await _deviceRegRepo.get();
-    if (existing != null) return existing['device_id'] as String;
-    final newId = 'CLD${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999).toString().padLeft(5, '0')}';
-    await _deviceRegRepo.insert({'device_id': newId, 'device_name': '', 'clinic_id': ''});
-    return newId;
-  }
-
-  Future<String> _getDeviceName() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('device_name') ?? 'Unknown';
-    } catch (_) {
-      return 'Unknown';
-    }
-  }
-
-  String _getAppVersion() {
-    try {
-      return '1.0.0';
-    } catch (_) {
-      return '1.0.0';
-    }
   }
 
   @override

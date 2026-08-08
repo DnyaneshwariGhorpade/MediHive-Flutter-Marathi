@@ -26,6 +26,26 @@ class PatientRepository {
     return rows.isNotEmpty ? rows.first : null;
   }
 
+  Future<List<Map<String, dynamic>>> getByIds(List<int> ids) async {
+    if (ids.isEmpty) return [];
+    final db = await _db;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    return db.query(
+      tablePatients,
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+    );
+  }
+
+  Future<Map<String, String>> getSyncIdNameMap() async {
+    final db = await _db;
+    final rows = await db.query(tablePatients, columns: ['sync_id', 'full_name']);
+    return {
+      for (final r in rows)
+        (r['sync_id'] as String? ?? ''): (r['full_name'] as String? ?? ''),
+    };
+  }
+
   Future<int> insert(Map<String, dynamic> row) async {
     final now = DateTime.now().toIso8601String();
     final db = await _db;

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/opd_provider.dart';
-import '../../providers/settings_provider.dart';
 import '../../repositories/opd_record_repository.dart';
 import '../../repositories/patient_repository.dart';
 import '../../widgets/pressable_card.dart';
@@ -36,11 +35,16 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
     try {
       final opdRepo = OpdRecordRepository();
       final patientRepo = PatientRepository();
-      final allPatients = await patientRepo.getAll();
-      _patientMap = {
-        for (final p in allPatients) (p['id'] as int): p,
-      };
       _records = await opdRepo.getByDate(_selectedDate);
+      final ids = <int>{};
+      for (final r in _records) {
+        final pid = r['patient_id'];
+        if (pid is int) ids.add(pid);
+      }
+      final patients = await patientRepo.getByIds(ids.toList());
+      _patientMap = {
+        for (final p in patients) (p['id'] as int): p,
+      };
     } catch (_) {
       _records = [];
       _patientMap = {};
@@ -53,6 +57,10 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
 
   void _scheduleRefreshIfStale() {
     if (_refreshScheduled) return;
+    if (_loaded &&
+        DateTime.now().difference(_lastRefresh).inSeconds < 5) {
+      return;
+    }
     _refreshScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshScheduled = false;
@@ -118,8 +126,6 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
 
   @override
   Widget build(BuildContext context) {
-    context.watch<SettingsProvider>();
-    context.watch<OpdProvider>();
     final l10n = AppLocalizations.of(context)!;
     _scheduleRefreshIfStale();
     return Scaffold(
