@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/opd_provider.dart';
 import '../../repositories/opd_record_repository.dart';
 import '../../repositories/patient_repository.dart';
+import '../../services/sync_refresh_bus.dart';
 import '../../widgets/pressable_card.dart';
 import '../../widgets/standard_header.dart';
 import '../../l10n/app_localizations.dart';
@@ -28,7 +29,18 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
   @override
   void initState() {
     super.initState();
+    SyncRefreshBus().addListener(_onSyncRefresh);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshBus().removeListener(_onSyncRefresh);
+    super.dispose();
+  }
+
+  void _onSyncRefresh() {
+    _loadData();
   }
 
   Future<void> _loadData() async {

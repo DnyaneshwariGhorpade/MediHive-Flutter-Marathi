@@ -79,7 +79,10 @@ class SyncManager extends ChangeNotifier {
         _debounceTimer = Timer(const Duration(seconds: 3), _trySync);
       }
     });
-    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _trySync());
+    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      SyncRefreshBus().notifyDataChanged();
+      _trySync();
+    });
     Timer(const Duration(seconds: 5), _trySync);
     await _registerDevice();
   }

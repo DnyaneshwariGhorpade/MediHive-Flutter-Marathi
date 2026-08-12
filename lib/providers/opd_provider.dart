@@ -12,6 +12,7 @@ import '../repositories/sync_queue_repository.dart';
 import '../utils/sync_id_generator.dart';
 import '../services/sync_manager.dart';
 import '../services/cloud_sync_manager.dart';
+import '../services/sync_refresh_bus.dart';
 import '../utils/helpers.dart';
 import 'dashboard_provider.dart';
 import 'appointment_provider.dart';
@@ -740,6 +741,8 @@ class OpdProvider extends ChangeNotifier {
           SyncManager().forceSyncNow();
         });
       }
+
+      SyncRefreshBus().notifyDataChanged();
 
       if (documentBytes != null && documentBytes.isNotEmpty) {
         try {
