@@ -789,16 +789,16 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
                                 final today = DateTime.now();
                                 int years = today.year - picked.year;
                                 int months = today.month - picked.month;
-                                if (months < 0 ||
-                                    (months == 0 && today.day < picked.day)) {
-                                  years--;
-                                  months += 12;
-                                }
                                 if (today.day < picked.day) {
                                   months--;
                                 }
                                 if (months < 0) {
-                                  months = 11;
+                                  years--;
+                                  months += 12;
+                                }
+                                if (years < 0) {
+                                  years = 0;
+                                  months = 0;
                                 }
                                 opd.setDob(iso);
                                 opd.setAge('$years yr $months mo');

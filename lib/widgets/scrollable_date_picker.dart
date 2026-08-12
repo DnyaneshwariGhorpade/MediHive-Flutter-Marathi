@@ -35,6 +35,14 @@ class _ScrollableDatePickerDialog extends StatefulWidget {
 class _ScrollableDatePickerDialogState extends State<_ScrollableDatePickerDialog> {
   DateTime? _pickedDate;
 
+  @override
+  void initState() {
+    super.initState();
+    _pickedDate = widget.initialDate ?? DateTime.now();
+    if (_pickedDate!.isBefore(widget.firstDate)) _pickedDate = widget.firstDate;
+    if (_pickedDate!.isAfter(widget.lastDate)) _pickedDate = widget.lastDate;
+  }
+
   void _onDateSelected(DateTime date) {
     _pickedDate = date;
   }
@@ -132,21 +140,47 @@ class _ScrollableDatePickerState extends State<ScrollableDatePicker> {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
-  int get daysInMonth {
-    return DateTime(_selectedYear, _selectedMonth + 1, 0).day;
+  int get _minMonth => (_selectedYear == widget.firstDate.year) ? widget.firstDate.month : 1;
+  int get _maxMonth => (_selectedYear == widget.lastDate.year) ? widget.lastDate.month : 12;
+
+  int get _daysInSelectedMonth => DateTime(_selectedYear, _selectedMonth + 1, 0).day;
+
+  int get _minDay {
+    if (_selectedYear == widget.firstDate.year && _selectedMonth == widget.firstDate.month) {
+      return widget.firstDate.day;
+    }
+    return 1;
+  }
+
+  int get _maxDay {
+    final monthDays = _daysInSelectedMonth;
+    if (_selectedYear == widget.lastDate.year && _selectedMonth == widget.lastDate.month) {
+      return widget.lastDate.day.clamp(1, monthDays);
+    }
+    return monthDays;
   }
 
   @override
   void initState() {
     super.initState();
-    final initial = widget.initialDate ?? DateTime.now();
-    _selectedDay = initial.day.clamp(1, 31);
-    _selectedMonth = initial.month;
-    _selectedYear = initial.year;
+    DateTime initial = widget.initialDate ?? DateTime.now();
+    if (initial.isBefore(widget.firstDate)) initial = widget.firstDate;
+    if (initial.isAfter(widget.lastDate)) initial = widget.lastDate;
 
-    _dayController = FixedExtentScrollController(initialItem: _selectedDay - 1);
-    _monthController = FixedExtentScrollController(initialItem: _selectedMonth - 1);
-    _yearController = FixedExtentScrollController(initialItem: _selectedYear - widget.firstDate.year);
+    _selectedYear = initial.year;
+    _selectedMonth = initial.month.clamp(_minMonth, _maxMonth);
+    _selectedDay = initial.day.clamp(_minDay, _maxDay);
+
+    _yearController = FixedExtentScrollController(
+      initialItem: (_selectedYear - widget.firstDate.year).clamp(0, widget.lastDate.year - widget.firstDate.year),
+    );
+    _monthController = FixedExtentScrollController(
+      initialItem: (_selectedMonth - _minMonth).clamp(0, _maxMonth - _minMonth),
+    );
+    _dayController = FixedExtentScrollController(
+      initialItem: (_selectedDay - _minDay).clamp(0, _maxDay - _minDay),
+    );
+
     widget.onDateSelected(DateTime(_selectedYear, _selectedMonth, _selectedDay));
   }
 
@@ -161,6 +195,19 @@ class _ScrollableDatePickerState extends State<ScrollableDatePicker> {
   @override
   Widget build(BuildContext context) {
     final yearCount = widget.lastDate.year - widget.firstDate.year + 1;
+    final minMonth = _minMonth;
+    final maxMonth = _maxMonth;
+    final minDay = _minDay;
+    final maxDay = _maxDay;
+
+    final monthItems = List.generate(
+      maxMonth - minMonth + 1,
+      (i) => monthNames[minMonth - 1 + i],
+    );
+    final dayItems = List.generate(
+      maxDay - minDay + 1,
+      (i) => '${minDay + i}',
+    );
 
     return Container(
       height: 220,
@@ -170,14 +217,12 @@ class _ScrollableDatePickerState extends State<ScrollableDatePicker> {
           Expanded(
             child: _buildColumn(
               controller: _dayController,
-              items: List.generate(31, (i) => '${i + 1}'),
+              items: dayItems,
               onChanged: (i) {
-                final day = i + 1;
-                final maxDay = daysInMonth;
+                final newDay = (minDay + i).clamp(minDay, maxDay);
                 setState(() {
-                  _selectedDay = day.clamp(1, maxDay);
+                  _selectedDay = newDay;
                 });
-                _dayController.jumpToItem(_selectedDay - 1);
                 widget.onDateSelected(DateTime(_selectedYear, _selectedMonth, _selectedDay));
               },
             ),
@@ -185,13 +230,19 @@ class _ScrollableDatePickerState extends State<ScrollableDatePicker> {
           Expanded(
             child: _buildColumn(
               controller: _monthController,
-              items: monthNames,
+              items: monthItems,
               onChanged: (i) {
+                final newMonth = (minMonth + i).clamp(minMonth, maxMonth);
                 setState(() {
-                  _selectedMonth = i + 1;
-                  _selectedDay = _selectedDay.clamp(1, daysInMonth);
+                  _selectedMonth = newMonth;
+                  // Re-clamp day for new month
+                  if (_selectedDay < _minDay) _selectedDay = _minDay;
+                  if (_selectedDay > _maxDay) _selectedDay = _maxDay;
                 });
-                _dayController.jumpToItem(_selectedDay - 1);
+                final targetDayIndex = (_selectedDay - _minDay).clamp(0, _maxDay - _minDay);
+                if (_dayController.hasClients) {
+                  _dayController.jumpToItem(targetDayIndex);
+                }
                 widget.onDateSelected(DateTime(_selectedYear, _selectedMonth, _selectedDay));
               },
             ),
@@ -201,14 +252,24 @@ class _ScrollableDatePickerState extends State<ScrollableDatePicker> {
               controller: _yearController,
               items: List.generate(yearCount, (i) => '${widget.firstDate.year + i}'),
               onChanged: (i) {
+                final newYear = widget.firstDate.year + i;
                 setState(() {
-                  _selectedYear = widget.firstDate.year + i;
-                  final maxDay = daysInMonth;
-                  if (_selectedDay > maxDay) {
-                    _selectedDay = maxDay;
-                    _dayController.jumpToItem(_selectedDay - 1);
-                  }
+                  _selectedYear = newYear;
+                  // Re-clamp month
+                  if (_selectedMonth < _minMonth) _selectedMonth = _minMonth;
+                  if (_selectedMonth > _maxMonth) _selectedMonth = _maxMonth;
+                  // Re-clamp day
+                  if (_selectedDay < _minDay) _selectedDay = _minDay;
+                  if (_selectedDay > _maxDay) _selectedDay = _maxDay;
                 });
+                final targetMonthIndex = (_selectedMonth - _minMonth).clamp(0, _maxMonth - _minMonth);
+                if (_monthController.hasClients) {
+                  _monthController.jumpToItem(targetMonthIndex);
+                }
+                final targetDayIndex = (_selectedDay - _minDay).clamp(0, _maxDay - _minDay);
+                if (_dayController.hasClients) {
+                  _dayController.jumpToItem(targetDayIndex);
+                }
                 widget.onDateSelected(DateTime(_selectedYear, _selectedMonth, _selectedDay));
               },
             ),
@@ -225,7 +286,7 @@ class _ScrollableDatePickerState extends State<ScrollableDatePicker> {
   }) {
     return Stack(
       children: [
-        ListWheelScrollView(
+        ListWheelScrollView.useDelegate(
           controller: controller,
           itemExtent: 40,
           diameterRatio: 1.5,
@@ -233,18 +294,22 @@ class _ScrollableDatePickerState extends State<ScrollableDatePicker> {
           magnification: 1.1,
           physics: const FixedExtentScrollPhysics(),
           onSelectedItemChanged: onChanged,
-          children: items.map((item) {
-            return Center(
-              child: Text(
-                item,
-                style: AppTheme.body.copyWith(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
+          childDelegate: ListWheelChildBuilderDelegate(
+            builder: (context, index) {
+              if (index < 0 || index >= items.length) return null;
+              return Center(
+                child: Text(
+                  items[index],
+                  style: AppTheme.body.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            },
+            childCount: items.length,
+          ),
         ),
         Positioned(
           left: 0,
