@@ -491,14 +491,6 @@ class _LoginScreenState extends State<LoginScreen>
                 label: Text(AppLocalizations.of(context)!.signInWithGoogle),
               ),
             )),
-            const SizedBox(height: 16),
-            _staggeredItem(3, TextButton(
-              onPressed: auth.isLoading ? null : () => context.push('/register'),
-              child: Text(
-                AppLocalizations.of(context)!.newClinicCreateAccount,
-                style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600, fontSize: 14),
-              ),
-            )),
           ],
         ),
       ),

@@ -276,28 +276,42 @@ class _BackupScreenState extends State<BackupScreen> {
     }
   }
 
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app/settings');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              StandardHeader(
-                title: l10n.backupAndCloudSyncTitle,
-                showBack: true,
-                onBack: () => context.go('/app/settings'),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      // Google Drive Usage Badge
-                      Consumer<SettingsProvider>(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: Stack(
+          children: [
+            CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                StandardHeader(
+                  title: l10n.backupAndCloudSyncTitle,
+                  showBack: true,
+                  onBack: _handleBack,
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        // Google Drive Usage Badge
+                        Consumer<SettingsProvider>(
                         builder: (context, settings, child) {
                           if (settings.googleUser == null) return const SizedBox.shrink();
                           return Container(
@@ -1002,6 +1016,7 @@ class _BackupScreenState extends State<BackupScreen> {
             ),
         ],
       ),
+    ),
     );
   }
 }

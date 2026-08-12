@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
+import '../../providers/settings_provider.dart';
 import '../../providers/patient_provider.dart';
 import '../../repositories/patient_repository.dart';
 import '../../repositories/sync_queue_repository.dart';
@@ -158,18 +159,34 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
     }
   }
 
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app/patients/${widget.patientId}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          StandardHeader(
-            title: l10n.editPatient,
-            showBack: true,
-          ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            StandardHeader(
+              title: l10n.editPatient,
+              showBack: true,
+              onBack: _handleBack,
+            ),
           if (_isLoading)
             const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator()),
@@ -314,6 +331,7 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
             ),
         ],
       ),
+    ),
     );
   }
 

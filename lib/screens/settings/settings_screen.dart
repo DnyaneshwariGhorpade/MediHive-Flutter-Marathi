@@ -458,12 +458,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       label: l10n.backupAndCloudSync,
                       iconBgColor: AppTheme.success.withValues(alpha: 0.1),
                       iconColor: AppTheme.success,
-                      onTap: () => context.go('/app/backup'),
+                      onTap: () => context.push('/app/backup'),
                     ),
                     SettingsGroupTile(
                       icon: Icons.shield_outlined,
                       label: l10n.authentication,
-                      onTap: () => context.go('/app/authentication'),
+                      onTap: () => context.push('/app/authentication'),
                       showDivider: false,
                     ),
                   ]),
@@ -497,7 +497,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SettingsGroupTile(
                       icon: Icons.help_outline,
                       label: l10n.helpCenter,
-                      onTap: () => context.go('/app/help'),
+                      onTap: () => context.push('/app/help'),
                       showDivider: false,
                     ),
                   ]),

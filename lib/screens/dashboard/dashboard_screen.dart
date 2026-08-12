@@ -568,7 +568,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               child: Column(
                 children: [
                   GestureDetector(
-                    onTap: () => context.go('/app/patients/${patient.id}'),
+                    onTap: () => context.push('/app/patients/${patient.id}'),
                     behavior: HitTestBehavior.opaque,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 10),

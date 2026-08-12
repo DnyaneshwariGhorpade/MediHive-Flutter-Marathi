@@ -358,6 +358,61 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
     );
   }
 
+  Future<void> _handleBack(BuildContext context) async {
+    final provider = context.read<OpdProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    if (!provider.hasUnsavedData) {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/app/opd');
+      }
+      return;
+    }
+    await showModalBottomSheet(
+      context: context,
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            title: Text(l10n.saveDraft),
+            leading: const Icon(Icons.save, color: Colors.orange),
+            onTap: () {
+              provider.saveDraft();
+              Navigator.pop(context); // close sheet
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/app/opd');
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l10n.draftSaved)),
+              );
+            },
+          ),
+          ListTile(
+            title: Text(l10n.discard),
+            leading: const Icon(Icons.delete, color: Colors.red),
+            onTap: () {
+              provider.clearDraft();
+              Navigator.pop(context); // close sheet
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/app/opd');
+              }
+            },
+          ),
+          ListTile(
+            title: Text(l10n.continueEditing),
+            leading: const Icon(Icons.edit),
+            onTap: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     context.watch<SettingsProvider>();
@@ -368,45 +423,7 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        final provider = context.read<OpdProvider>();
-        if (!provider.hasUnsavedData) {
-          Navigator.of(context).pop();
-          return;
-        }
-        await showModalBottomSheet(
-          context: context,
-          builder: (_) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: Text(l10n.saveDraft),
-                leading: const Icon(Icons.save, color: Colors.orange),
-                onTap: () {
-                  provider.saveDraft();
-                  Navigator.pop(context); // close sheet
-                  Navigator.pop(context); // exit form
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.draftSaved)),
-                  );
-                },
-              ),
-              ListTile(
-                title: Text(l10n.discard),
-                leading: const Icon(Icons.delete, color: Colors.red),
-                onTap: () {
-                  provider.clearDraft();
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: Text(l10n.continueEditing),
-                leading: const Icon(Icons.edit),
-                onTap: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
+        await _handleBack(context);
       },
       child: Scaffold(
         backgroundColor: AppTheme.background,
@@ -417,7 +434,11 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
                 controller: _scrollController,
                 physics: const BouncingScrollPhysics(),
                 slivers: [
-                  StandardHeader(title: l10n.opdRegistration),
+                  StandardHeader(
+                    title: l10n.opdRegistration,
+                    showBack: true,
+                    onBack: () => _handleBack(context),
+                  ),
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),

@@ -114,11 +114,33 @@ class _AuthSettingsScreenState extends State<AuthSettingsScreen> {
     }
   }
 
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app/settings');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Scaffold(backgroundColor: AppTheme.background, body: CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
-      StandardHeader(title: l10n.authenticationTitle, showBack: true, onBack: () => context.go('/app/settings')),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            StandardHeader(
+              title: l10n.authenticationTitle,
+              showBack: true,
+              onBack: _handleBack,
+            ),
       SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(16), child: Column(children: [
         SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
@@ -193,7 +215,8 @@ class _AuthSettingsScreenState extends State<AuthSettingsScreen> {
         ])),
         SizedBox(height: 80),
       ]))),
-    ]));
+    ])),
+    );
   }
 
   Widget _pwField(String label, TextEditingController ctrl, bool show, VoidCallback toggle) {

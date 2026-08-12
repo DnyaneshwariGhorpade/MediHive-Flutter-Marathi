@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/opd_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../repositories/opd_record_repository.dart';
 import '../../repositories/patient_repository.dart';
 import '../../services/sync_refresh_bus.dart';
@@ -87,13 +88,27 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark || AppTheme.isDarkMode;
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppTheme.primary,
-              onPrimary: Colors.white,
-            ),
-          ),
+          data: isDark
+              ? ThemeData.dark().copyWith(
+                  colorScheme: ColorScheme.dark(
+                    primary: AppTheme.primaryLighter,
+                    onPrimary: Colors.white,
+                    surface: AppTheme.darkCard,
+                    onSurface: Colors.white,
+                  ),
+                  dialogTheme: DialogThemeData(backgroundColor: AppTheme.darkCard),
+                )
+              : ThemeData.light().copyWith(
+                  colorScheme: ColorScheme.light(
+                    primary: AppTheme.primary,
+                    onPrimary: Colors.white,
+                    surface: Colors.white,
+                    onSurface: AppTheme.textPrimaryLight,
+                  ),
+                  dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
+                ),
           child: child!,
         );
       },
@@ -138,6 +153,7 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
     _scheduleRefreshIfStale();
     return Scaffold(
@@ -282,7 +298,7 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                onPressed: () => context.go('/app/opd/new'),
+                                onPressed: () => context.push('/app/opd/new'),
                               ),
                             ],
                           ],
@@ -496,7 +512,7 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
               elevation: 4,
               onPressed: () {
                 context.read<OpdProvider>().reset();
-                context.go('/app/opd/new');
+                context.push('/app/opd/new');
               },
               icon: const Icon(Icons.add, color: Colors.white),
               label: Text(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
+import '../../providers/settings_provider.dart';
 import '../../widgets/standard_header.dart';
 import '../../widgets/section_card.dart';
 import '../../l10n/app_localizations.dart';
@@ -26,12 +28,35 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     }
   }
 
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app/settings');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
     _initFaqs(l10n);
-    return Scaffold(backgroundColor: AppTheme.background, body: CustomScrollView(physics: const BouncingScrollPhysics(), slivers: [
-      StandardHeader(title: l10n.helpAndSupport, showBack: true, onBack: () => context.go('/app/settings')),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            StandardHeader(
+              title: l10n.helpAndSupport,
+              showBack: true,
+              onBack: _handleBack,
+            ),
       SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(16), child: Column(children: [
         _infoCard(Icons.code, Color(0x1A1A506C), AppTheme.primary, l10n.developerInformation, [
           _row(l10n.forTechnicalQueries, ''),
@@ -94,7 +119,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         ])),
         SizedBox(height: 80),
       ]))),
-    ]));
+    ])),
+    );
   }
 
   Widget _infoCard(IconData icon, Color bg, Color fg, String title, List<Widget> children) => SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

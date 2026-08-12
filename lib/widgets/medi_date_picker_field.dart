@@ -107,13 +107,27 @@ class _MediDatePickerFieldState extends State<MediDatePickerField> {
       initialDatePickerMode:
           isDob ? DatePickerMode.year : DatePickerMode.day,
       builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark || AppTheme.isDarkMode;
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppTheme.primary,
-                  onPrimary: Colors.white,
+          data: isDark
+              ? ThemeData.dark().copyWith(
+                  colorScheme: ColorScheme.dark(
+                    primary: AppTheme.primaryLighter,
+                    onPrimary: Colors.white,
+                    surface: AppTheme.darkCard,
+                    onSurface: Colors.white,
+                  ),
+                  dialogTheme: DialogThemeData(backgroundColor: AppTheme.darkCard),
+                )
+              : ThemeData.light().copyWith(
+                  colorScheme: ColorScheme.light(
+                    primary: AppTheme.primary,
+                    onPrimary: Colors.white,
+                    surface: Colors.white,
+                    onSurface: AppTheme.textPrimaryLight,
+                  ),
+                  dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
                 ),
-          ),
           child: child!,
         );
       },

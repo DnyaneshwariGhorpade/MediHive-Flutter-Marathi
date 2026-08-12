@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
+import '../../providers/settings_provider.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -17,6 +19,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   void _initPrompts(AppLocalizations l10n) {
     if (_prompts.isEmpty) {
       _prompts = [l10n.chatPromptAddPatient, l10n.chatPromptExportData, l10n.chatPromptAppointments, l10n.chatPromptPrescription];
+    }
+  }
+
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app');
     }
   }
 
@@ -82,16 +92,23 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
     _initPrompts(l10n);
-    return Scaffold(backgroundColor: AppTheme.background, body: Column(children: [
-      Container(
-        decoration: const BoxDecoration(gradient: AppTheme.primaryGradient,
-          borderRadius: BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
-          boxShadow: [BoxShadow(color: Color(0x30000000), blurRadius: 12, offset: Offset(0, 4))]),
-        child: SafeArea(bottom: false, child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          child: Row(children: [
-            GestureDetector(onTap: () => context.go('/app'), child: Icon(Icons.arrow_back, color: Colors.white, size: 24)),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(backgroundColor: AppTheme.background, body: Column(children: [
+        Container(
+          decoration: const BoxDecoration(gradient: AppTheme.primaryGradient,
+            borderRadius: BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+            boxShadow: [BoxShadow(color: Color(0x30000000), blurRadius: 12, offset: Offset(0, 4))]),
+          child: SafeArea(bottom: false, child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Row(children: [
+              GestureDetector(onTap: _handleBack, child: const Icon(Icons.arrow_back, color: Colors.white, size: 24)),
             SizedBox(width: 12),
             Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
               child: Icon(Icons.smart_toy_outlined, color: Colors.white, size: 24)),
@@ -152,7 +169,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           }
         },
       )),
-    ]));
+    ])),
+    );
   }
 
   Widget _buildMessageBubble(Map<String, String?> msg, bool isBot) {

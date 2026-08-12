@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/notification_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../widgets/animated_list_item.dart';
 import '../../widgets/standard_header.dart';
 
@@ -28,19 +30,36 @@ class NotificationsScreen extends StatelessWidget {
     }
   }
 
+  void _handleBack(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app/settings');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
     final provider = context.watch<NotificationProvider>();
     final notifications = provider.notifications;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          StandardHeader(
-            title: l10n.notificationsTitle,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack(context);
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            StandardHeader(
+              title: l10n.notificationsTitle,
+              showBack: true,
+              onBack: () => _handleBack(context),
             trailingActions: notifications.isNotEmpty
                 ? [
                     IconButton(
@@ -198,6 +217,7 @@ class NotificationsScreen extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

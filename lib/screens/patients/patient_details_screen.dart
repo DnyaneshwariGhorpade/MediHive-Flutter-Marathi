@@ -57,7 +57,6 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
   List<VisitRecord> _visits = [];
   List<Map<String, dynamic>> _opdRows = [];
   bool _loaded = false;
-  int _loadVersion = 0;
 
   @override
   void initState() {
@@ -67,7 +66,6 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
 
   Future<void> _loadData({bool force = false}) async {
     if (_loaded && !force) return;
-    _loadVersion++;
     final patientRepo = PatientRepository();
     var patientRow = await patientRepo.getBySyncId(widget.patientId);
     patientRow ??= await _getPatientByLocalId(patientRepo);
@@ -250,21 +248,70 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
     await _loadData();
   }
 
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app/patients');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
 
     if (!_loaded) {
-      return Scaffold(
-        backgroundColor: AppTheme.background,
-        body: const Center(child: CircularProgressIndicator()),
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          _handleBack();
+        },
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: const Center(child: CircularProgressIndicator()),
+        ),
       );
     }
 
     final patient = _patient;
     if (patient == null) {
-      return Scaffold(
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          _handleBack();
+        },
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              StandardHeader(
+                title: l10n.patientDetails,
+                roundedCorners: false,
+                showBack: true,
+                onBack: _handleBack,
+              ),
+              SliverFillRemaining(
+                child: Center(child: Text(l10n.patientNotFound)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final visits = _visits;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
         backgroundColor: AppTheme.background,
         body: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -272,23 +319,9 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
             StandardHeader(
               title: l10n.patientDetails,
               roundedCorners: false,
+              showBack: true,
+              onBack: _handleBack,
             ),
-            SliverFillRemaining(
-              child: Center(child: Text(l10n.patientNotFound)),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final visits = _visits;
-
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          StandardHeader(title: l10n.patientDetails, roundedCorners: false),
           SliverToBoxAdapter(
             child: Column(
               children: [
@@ -501,7 +534,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                             Expanded(
                               flex: 3,
                               child: ElevatedButton.icon(
-                                onPressed: () => context.go(
+                                onPressed: () => context.push(
                                   '/app/prescription/${widget.patientId}',
                                 ),
                                 icon: Icon(Icons.description, size: 20),
@@ -778,6 +811,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 

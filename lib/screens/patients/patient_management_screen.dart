@@ -115,13 +115,27 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark || AppTheme.isDarkMode;
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppTheme.primary,
-              onPrimary: Colors.white,
-            ),
-          ),
+          data: isDark
+              ? ThemeData.dark().copyWith(
+                  colorScheme: ColorScheme.dark(
+                    primary: AppTheme.primaryLighter,
+                    onPrimary: Colors.white,
+                    surface: AppTheme.darkCard,
+                    onSurface: Colors.white,
+                  ),
+                  dialogTheme: DialogThemeData(backgroundColor: AppTheme.darkCard),
+                )
+              : ThemeData.light().copyWith(
+                  colorScheme: ColorScheme.light(
+                    primary: AppTheme.primary,
+                    onPrimary: Colors.white,
+                    surface: Colors.white,
+                    onSurface: AppTheme.textPrimaryLight,
+                  ),
+                  dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
+                ),
           child: child!,
         );
       },
@@ -327,7 +341,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
                             child: Padding(
                               padding: const EdgeInsets.only(bottom: 12),
                               child: PressableCard(
-                                onTap: () => context.go('/app/patients/$id'),
+                                onTap: () => context.push('/app/patients/$id'),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: AppTheme.cardBg,
@@ -411,7 +425,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               GestureDetector(
-                                                onTap: () => context.go(
+                                                onTap: () => context.push(
                                                   '/app/patients/$id',
                                                 ),
                                                 child: Container(
@@ -435,7 +449,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
                                               ),
                                               const SizedBox(width: 6),
                                               GestureDetector(
-                                                onTap: () => context.go(
+                                                onTap: () => context.push(
                                                   '/app/patients/$id/edit',
                                                 ),
                                                 child: Container(

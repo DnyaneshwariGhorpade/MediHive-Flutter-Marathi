@@ -406,78 +406,115 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     });
   }
 
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app/patients/${widget.patientId}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
 
     if (!_dataLoaded) {
-      return Scaffold(
-        backgroundColor: AppTheme.background,
-        body: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            StandardHeader(title: l10n.prescription, showBack: true),
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          ],
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          _handleBack();
+        },
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              StandardHeader(
+                title: l10n.prescription,
+                showBack: true,
+                onBack: _handleBack,
+              ),
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (_hasError) {
-      return Scaffold(
-        backgroundColor: AppTheme.background,
-        body: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            StandardHeader(title: l10n.prescription, showBack: true),
-            SliverFillRemaining(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.description_outlined,
-                        size: 64,
-                        color: AppTheme.textHint,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        _errorMessage,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppTheme.textSecondary,
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          _handleBack();
+        },
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              StandardHeader(
+                title: l10n.prescription,
+                showBack: true,
+                onBack: _handleBack,
+              ),
+              SliverFillRemaining(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.description_outlined,
+                          size: 64,
+                          color: AppTheme.textHint,
                         ),
-                      ),
-                    ],
+                        SizedBox(height: 16),
+                        Text(
+                          _errorMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          StandardHeader(
-            title: l10n.prescription,
-            showBack: true,
-            onBack: () => context.go('/app/patients/${widget.patientId}'),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              child: Text(
-                _rx.date,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            StandardHeader(
+              title: l10n.prescription,
+              showBack: true,
+              onBack: _handleBack,
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                child: Text(
+                  _rx.date,
                 style: TextStyle(
                   color: AppTheme.textSecondary,
                   fontSize: 13,
@@ -1252,6 +1289,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 

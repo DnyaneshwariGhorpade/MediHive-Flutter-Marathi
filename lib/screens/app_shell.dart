@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
+import '../providers/settings_provider.dart';
 import '../l10n/app_localizations.dart';
 
 class AppShell extends StatelessWidget {
@@ -11,13 +13,22 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<SettingsProvider>();
     final currentIndex = navigationShell.currentIndex;
     final l10n = AppLocalizations.of(context)!;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: navigationShell,
-      bottomNavigationBar: Container(
+    return PopScope(
+      canPop: currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (currentIndex != 0) {
+          navigationShell.goBranch(0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: navigationShell,
+        bottomNavigationBar: Container(
         height: 80,
         decoration: BoxDecoration(
           color: AppTheme.cardBg,
@@ -48,6 +59,7 @@ class AppShell extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 
