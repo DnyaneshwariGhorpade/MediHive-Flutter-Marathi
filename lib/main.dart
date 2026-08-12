@@ -55,6 +55,13 @@ import 'screens/chatbot/chatbot_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  try {
+    await dotenv.load(fileName: "assets/.env");
+    print('DOTENV LOADED SUCCESSFULLY');
+  } catch (e) {
+    print('DOTENV LOAD FAILED: $e');
+  }
+
   print('MAIN START');
 
   // Sync when the app returns to the foreground so changes from other
@@ -71,8 +78,6 @@ void main() async {
     print('SYNCMANAGER FAILED: $e');
     print(st);
   }
-
-  await dotenv.load(fileName: "assets/.env");
 
   // Start cloud sync manager (runs in background, polls every 20s)
   if (!kIsWeb) {

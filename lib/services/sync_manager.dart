@@ -355,7 +355,7 @@ class SyncManager extends ChangeNotifier {
 
       // Live refresh: when remote changes were applied, tell all in-memory
       // providers to reload from local storage so the UI updates immediately.
-      if (pullApplied > 0) {
+      if (pullApplied > 0 || pushCount > 0) {
         SyncRefreshBus().notifyDataChanged();
       }
     } catch (e) {
@@ -563,15 +563,19 @@ class SyncManager extends ChangeNotifier {
     return applied;
   }
 
-  Future<void> forceSyncNow() async {
+  Future<void> forceSyncNow({bool immediate = true}) async {
     if (_syncState == SyncState.syncing) {
       _pendingSyncRequested = true;
       return;
     }
     _forceDebounce?.cancel();
-    _forceDebounce = Timer(const Duration(milliseconds: 1500), () async {
+    if (immediate) {
       await _trySync();
-    });
+    } else {
+      _forceDebounce = Timer(const Duration(milliseconds: 500), () async {
+        await _trySync();
+      });
+    }
   }
 
   Future<bool> triggerManualSync() async {
@@ -581,6 +585,7 @@ class SyncManager extends ChangeNotifier {
     }
     _forceDebounce?.cancel();
     await _trySync();
+    SyncRefreshBus().notifyDataChanged();
     return _syncState == SyncState.synced;
   }
 

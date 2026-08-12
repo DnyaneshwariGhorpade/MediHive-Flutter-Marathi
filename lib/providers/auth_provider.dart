@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../services/backup_code_service.dart';
 import '../services/api_service.dart';
+import '../services/sync_manager.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -120,6 +121,9 @@ class AuthProvider extends ChangeNotifier {
       } else {
         await _storageService.clearAuth();
       }
+
+      // Auto-pull existing records from cloud immediately upon login
+      SyncManager().forceSyncNow(immediate: true);
     } else {
       _loginError = 'Invalid username or password';
     }
@@ -144,6 +148,7 @@ class AuthProvider extends ChangeNotifier {
     await _storageService.setLoggedIn(true);
     _pendingUsername = '';
     notifyListeners();
+    SyncManager().forceSyncNow(immediate: true);
     return true;
   }
 
@@ -164,6 +169,7 @@ class AuthProvider extends ChangeNotifier {
       _isAuthenticated = true;
       _currentUser = user;
       await _storageService.setLoggedIn(true);
+      SyncManager().forceSyncNow(immediate: true);
     }
 
     _isLoading = false;
@@ -223,6 +229,9 @@ class AuthProvider extends ChangeNotifier {
           debugPrint('WARNING: Failed to refresh clinic_id on restart: $e');
         }
       }
+
+      // Auto-pull existing records on session restore
+      SyncManager().forceSyncNow(immediate: true);
     }
     _hasLoadedCredentials = true;
     notifyListeners();

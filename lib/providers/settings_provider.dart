@@ -179,11 +179,18 @@ class SettingsProvider extends ChangeNotifier {
       }
 
       // 2. Check Google Drive connection for backup features (optional).
-      //    If not connected, the Flask sync above still succeeded.
       final signedIn = await _googleAuthService.isSignedIn();
       if (!signedIn) {
-        _googleAuthError = 'Google Drive not connected — OPD data was synced to sheet, but Drive backup skipped.';
+        _googleAuthError = null;
         _isSyncing = false;
+        final now = DateTime.now();
+        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        final String amPm = now.hour >= 12 ? 'PM' : 'AM';
+        final int displayHour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
+        final String minuteStr = now.minute.toString().padLeft(2, '0');
+        _lastSyncTime = '${now.day} ${months[now.month - 1]} ${now.year}, ${displayHour.toString().padLeft(2, '0')}:$minuteStr $amPm';
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('lastSyncTime', _lastSyncTime);
         notifyListeners();
         return;
       }
