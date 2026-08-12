@@ -27,13 +27,15 @@ class _MedicineFieldData {
   final TextEditingController name;
   final TextEditingController dosage;
   final TextEditingController duration;
+  final FocusNode nameFocusNode;
   _MedicineFieldData({
     String name = '',
     String dosage = 'As directed',
     String duration = '-',
   }) : name = TextEditingController(text: name),
        dosage = TextEditingController(text: dosage),
-       duration = TextEditingController(text: duration);
+       duration = TextEditingController(text: duration),
+       nameFocusNode = FocusNode();
 
   Medicine toMedicine() => Medicine(
     name: name.text.trim(),
@@ -45,6 +47,7 @@ class _MedicineFieldData {
     name.dispose();
     dosage.dispose();
     duration.dispose();
+    nameFocusNode.dispose();
   }
 }
 
@@ -65,7 +68,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
   late TextEditingController _notesController;
   late TextEditingController _panchakarmaNotesController;
   late TextEditingController _nextVisitController;
-  late List<_MedicineFieldData> _medicineFields;
+  List<_MedicineFieldData> _medicineFields = [];
   late Map<String, dynamic> _latestRecord;
   late Prescription _rx;
 
@@ -115,6 +118,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
 
       _latestRecord = records.first;
 
+      if (!mounted) return;
       final settings = context.read<SettingsProvider>();
 
       final medRaw = _latestRecord['medicines'] as String? ?? '';
@@ -208,6 +212,9 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
   }
 
   void _initMedicineFields() {
+    for (final f in _medicineFields) {
+      f.dispose();
+    }
     _medicineFields = _rx.medicines
         .map(
           (m) => _MedicineFieldData(
@@ -294,6 +301,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     updatedRow['next_visit_date'] = newNextVisit.isNotEmpty
         ? newNextVisit
         : (_latestRecord['next_visit_date'] as String? ?? '');
+    updatedRow['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
     try {
       await opdRepo.update(_latestRecord['id'] as int, updatedRow);
@@ -770,6 +778,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                                           SizedBox(height: 8),
                                           Autocomplete<String>(
                                             textEditingController: e.value.name,
+                                            focusNode: e.value.nameFocusNode,
                                             displayStringForOption: (o) => o,
                                             optionsBuilder:
                                                 (TextEditingValue t) async {
