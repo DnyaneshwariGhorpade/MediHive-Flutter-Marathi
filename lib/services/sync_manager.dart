@@ -717,9 +717,17 @@ class SyncManager extends ChangeNotifier {
 
   Future<Map<String, dynamic>> _remoteOpdToRow(Map<String, dynamic> remote, int sqliteId) async {
     final remotePatientId = remote['patient_id']?.toString() ?? '';
-    int localPatientId;
+    int localPatientId = 0;
     try {
-      final patient = await _patientRepo.getBySyncId(remotePatientId);
+      var patient = await _patientRepo.getBySyncId(remotePatientId);
+      if (patient == null && remotePatientId.isNotEmpty) {
+        final parsed = int.tryParse(remotePatientId.replaceAll(RegExp(r'[^0-9]'), ''));
+        if (parsed != null && parsed > 0) {
+          final padded = 'P${parsed.toString().padLeft(3, '0')}';
+          patient = await _patientRepo.getBySyncId(padded);
+          patient ??= await _patientRepo.getById(parsed);
+        }
+      }
       localPatientId = patient?['id'] as int? ?? 0;
     } catch (_) {
       localPatientId = 0;

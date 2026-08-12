@@ -139,4 +139,22 @@ class PatientRepository {
     final result = await db.rawQuery('SELECT COALESCE(MAX(id), 0) AS max_id FROM $tablePatients');
     return Sqflite.firstIntValue(result) ?? 0;
   }
+
+  Future<int> getMaxNumericPatientId() async {
+    final db = await _db;
+    final rows = await db.query(tablePatients, columns: ['id', 'sync_id']);
+    int maxNum = 0;
+    for (final r in rows) {
+      final intId = r['id'] as int? ?? 0;
+      if (intId > maxNum) maxNum = intId;
+      final syncId = r['sync_id'] as String? ?? '';
+      final match = RegExp(r'(\d+)').firstMatch(syncId);
+      if (match != null) {
+        final num = int.tryParse(match.group(1)!) ?? 0;
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    return maxNum;
+  }
 }
+

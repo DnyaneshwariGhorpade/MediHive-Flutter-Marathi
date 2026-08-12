@@ -162,7 +162,9 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
       final nextVisit = _latestRecord['next_visit_date'] as String? ?? '';
       final patientName = patientRow['full_name'] as String? ?? '';
       final patientSyncId = patientRow['sync_id'] as String? ?? '';
-      final patientIdStr = patientSyncId.isNotEmpty ? patientSyncId : 'P$sqliteId';
+      final patientIdStr = patientSyncId.isNotEmpty
+          ? patientSyncId
+          : 'P${sqliteId.toString().padLeft(3, '0')}';
       final patientAge = patientRow['age'] as int? ?? 0;
       final patientGender = patientRow['gender'] as String? ?? '';
       final patientMobile = patientRow['mobile_number'] as String? ?? '';

@@ -314,6 +314,9 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
                           final patientName = patient?['full_name'] as String?;
                           final patientAge = patient?['age'] as int? ?? 0;
                           final patientGender = patient?['gender'] as String?;
+                          final patientSyncId = (patient?['sync_id'] as String?)?.isNotEmpty == true
+                              ? patient!['sync_id'] as String
+                              : 'P${(record['patient_id'] as int).toString().padLeft(3, '0')}';
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
@@ -329,7 +332,7 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
                                   child: Row(
                                     children: [
                                       Hero(
-                                        tag: 'queue_avatar_P${record['patient_id']}',
+                                        tag: 'queue_avatar_$patientSyncId',
                                         child: CircleAvatar(
                                           radius: 24,
                                           backgroundColor: AppTheme.primary
@@ -377,7 +380,7 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
                                               children: [
                                                 Flexible(
                                                   child: Text(
-                                                    'ID: P${record['patient_id']}',
+                                                    'ID: $patientSyncId',
                                                     style: AppTheme.caption.copyWith(
                                                       fontSize: 11,
                                                       fontWeight: FontWeight.w600,
@@ -454,7 +457,7 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
                                                 const SizedBox(width: 8),
                                                 GestureDetector(
                                                   onTap: () => context.push(
-                                                    '/app/prescription/P${record['patient_id']}',
+                                                    '/app/prescription/$patientSyncId',
                                                   ),
                                                   child: const Padding(
                                                     padding:

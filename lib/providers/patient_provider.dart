@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/opd_form_data.dart';
 import '../models/patient.dart';
@@ -210,15 +209,12 @@ class PatientProvider extends ChangeNotifier {
     onSearchChanged(query);
   }
 
-  String _generateTempId() {
-    final timestamp = DateTime.now().microsecondsSinceEpoch;
-    final random = Random().nextInt(99999).toString().padLeft(5, '0');
-    return 'TEMP_$timestamp$random';
+  Future<String> generateNextPatientId() async {
+    final maxNum = await _repo.getMaxNumericPatientId();
+    final nextNum = maxNum + 1;
+    return 'P${nextNum.toString().padLeft(3, '0')}';
   }
 
-  Future<String> generateNextPatientId() async {
-    return _generateTempId();
-  }
 
   int _calculateAgeFromDob(String dobStr) {
     final dob = DateTime.tryParse(dobStr);
@@ -344,12 +340,6 @@ class PatientProvider extends ChangeNotifier {
         }
       }
     } catch (_) {}
-  }
-
-  int _toSqliteId(String hiveId) {
-    final match = RegExp(r'(\d+)').firstMatch(hiveId);
-    if (match != null) return int.parse(match.group(1)!);
-    return 0;
   }
 
   String _toStringId(int sqliteId) {
