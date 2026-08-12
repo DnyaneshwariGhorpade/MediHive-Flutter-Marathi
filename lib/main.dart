@@ -50,7 +50,6 @@ import 'screens/help/help_center_screen.dart';
 import 'screens/backup/backup_screen.dart';
 import 'screens/auth_settings/auth_settings_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
-import 'screens/settings/import_screen.dart';
 import 'screens/chatbot/chatbot_screen.dart';
 
 void main() async {
@@ -443,10 +442,6 @@ final _router = GoRouter(
                 GoRoute(
                   path: 'notifications',
                   builder: (context, state) => const NotificationsScreen(),
-                ),
-                GoRoute(
-                  path: 'import',
-                  builder: (context, state) => const ImportScreen(),
                 ),
               ],
             ),
