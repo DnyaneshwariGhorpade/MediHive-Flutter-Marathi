@@ -65,7 +65,7 @@ class PatientRepository {
       'sync_status': row['sync_status'] ?? 'pending',
       'last_synced_at': row['last_synced_at'],
       'created_at': row['created_at'] ?? now,
-      'updated_at': row['updated_at'] ?? row['created_at'] ?? now,
+      'updated_at': row['updated_at'] ?? row['created_at'] ?? DateTime.now().toUtc().toIso8601String(),
       'weight': row['weight'],
     });
   }
@@ -74,7 +74,7 @@ class PatientRepository {
     final db = await _db;
     final affected = await db.update(tablePatients, {
       ...row,
-      'updated_at': row['updated_at'] ?? DateTime.now().toIso8601String(),
+      'updated_at': row['updated_at'] ?? DateTime.now().toUtc().toIso8601String(),
     }, where: 'id = ?', whereArgs: [id]);
     print('PATIENT REPO UPDATE: id=$id affectedRows=$affected');
     return affected;
@@ -84,7 +84,7 @@ class PatientRepository {
     final db = await _db;
     return db.update(
       tablePatients,
-      {'sync_id': newSyncId, 'updated_at': DateTime.now().toIso8601String()},
+      {'sync_id': newSyncId, 'updated_at': DateTime.now().toUtc().toIso8601String()},
       where: 'sync_id = ?',
       whereArgs: [oldSyncId],
     );

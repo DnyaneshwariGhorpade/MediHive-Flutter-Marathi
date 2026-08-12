@@ -293,7 +293,7 @@ class SyncWorkerThread(threading.Thread):
                 from models.device_registry import DeviceRegistry
                 from services.fcm_service import send_silent_push_notification
                 
-                devices = DeviceRegistry.get_by_clinic(clinic_id)
+                devices = DeviceRegistry.get_notifiable(clinic_id)
                 other_devices = [d for d in devices if d and d.get('device_id') != origin_device_id]
                 logger.info("SyncWorker: Sending silent push to other devices count: %d", len(other_devices))
                 

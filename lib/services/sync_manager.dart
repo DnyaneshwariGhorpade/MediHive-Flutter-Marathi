@@ -8,6 +8,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'api_service.dart';
 import 'connectivity_service.dart';
 import 'firebase_messaging_service.dart';
+import 'sync_refresh_bus.dart';
 import '../utils/sync_id_generator.dart';
 import '../models/appointment_model.dart';
 import '../repositories/patient_repository.dart';
@@ -78,7 +79,7 @@ class SyncManager extends ChangeNotifier {
         _debounceTimer = Timer(const Duration(seconds: 3), _trySync);
       }
     });
-    _pollTimer = Timer.periodic(const Duration(minutes: 2), (_) => _trySync());
+    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _trySync());
     Timer(const Duration(seconds: 5), _trySync);
     await _registerDevice();
   }
@@ -90,11 +91,36 @@ class SyncManager extends ChangeNotifier {
       await ApiService.cloudRegisterDevice(
         deviceId: _deviceId!,
         deviceName: _getDeviceName(),
-        clinicId: '',
+        clinicId: await _loadClinicId(),
         appVersion: '1.0.0',
         fcmToken: fcmToken,
       );
     } catch (_) {}
+  }
+
+  /// Re-registers this device when a fresh FCM token arrives so the backend
+  /// always holds a valid token to send silent `sync_trigger` pushes to.
+  Future<void> registerDeviceWithToken(String fcmToken) async {
+    if (kIsWeb) return;
+    if (_deviceId == null) return;
+    try {
+      await ApiService.cloudRegisterDevice(
+        deviceId: _deviceId!,
+        deviceName: _getDeviceName(),
+        clinicId: await _loadClinicId(),
+        appVersion: '1.0.0',
+        fcmToken: fcmToken,
+      );
+    } catch (_) {}
+  }
+
+  Future<String> _loadClinicId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('clinic_id') ?? '';
+    } catch (_) {
+      return '';
+    }
   }
 
   Future<void> _trySync() async {
@@ -323,6 +349,12 @@ class SyncManager extends ChangeNotifier {
         'last_flask_sync',
         data['server_time']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
       );
+
+      // Live refresh: when remote changes were applied, tell all in-memory
+      // providers to reload from local storage so the UI updates immediately.
+      if (pullApplied > 0) {
+        SyncRefreshBus().notifyDataChanged();
+      }
     } catch (e) {
       debugPrint('SYNC pull failed (non-fatal): $e');
     }
@@ -359,7 +391,7 @@ class SyncManager extends ChangeNotifier {
       try {
         final map = Map<String, dynamic>.from(json as Map);
         final remoteId = map['id']?.toString() ?? '';
-        final remoteUpdated = DateTime.tryParse(map['updated_at']?.toString() ?? '');
+        final remoteUpdated = _parseRemoteTimestamp(map['updated_at']?.toString());
         final existing = await _patientRepo.getBySyncId(remoteId);
         final localUpdated = DateTime.tryParse(
           existing?['updated_at'] as String? ?? existing?['created_at'] as String? ?? '',
@@ -385,7 +417,7 @@ class SyncManager extends ChangeNotifier {
       try {
         final map = Map<String, dynamic>.from(json as Map);
         final remoteId = map['id']?.toString() ?? '';
-        final remoteUpdated = DateTime.tryParse(map['updated_at']?.toString() ?? '');
+        final remoteUpdated = _parseRemoteTimestamp(map['updated_at']?.toString());
         final existing = await _opdRepo.getByOpdId(remoteId);
         final localUpdated = DateTime.tryParse(
           existing?['updated_at'] as String? ?? existing?['created_at'] as String? ?? '',
@@ -476,7 +508,7 @@ class SyncManager extends ChangeNotifier {
         final map = Map<String, dynamic>.from(json as Map);
         final apptBox = Hive.box<AppointmentModel>('appointments');
         final existing = apptBox.get(map['id']);
-        final remoteUpdated = DateTime.tryParse(map['updated_at']?.toString() ?? '');
+        final remoteUpdated = _parseRemoteTimestamp(map['updated_at']?.toString());
         if (existing == null ||
             (remoteUpdated != null && existing.updatedAt.isBefore(remoteUpdated))) {
           apptBox.put(map['id'], AppointmentModel.fromJson(map).copyWith(isSynced: true));
@@ -591,6 +623,11 @@ class SyncManager extends ChangeNotifier {
         'last_flask_sync',
         data['server_time']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
       );
+
+      // Live refresh after a full restore so the UI reflects restored data.
+      if (_lastSyncApplied > 0) {
+        SyncRefreshBus().notifyDataChanged();
+      }
       _syncState = SyncState.synced;
       notifyListeners();
       return true;
@@ -670,7 +707,7 @@ class SyncManager extends ChangeNotifier {
       'blood_group': remote['blood_group']?.toString() ?? 'Not Specified',
       'address': remote['address']?.toString() ?? '',
       'created_at': remote['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-      'updated_at': remote['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+      'updated_at': _asUtcIso(remote['updated_at']?.toString() ?? ''),
       'weight': remote['weight'] != null ? (remote['weight'] as num).toDouble() : null,
     };
   }
@@ -706,17 +743,45 @@ class SyncManager extends ChangeNotifier {
       'discount_type': remote['discount_type']?.toString() ?? '',
       'blood_group': remote['blood_group']?.toString() ?? '',
       'created_at': remote['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-      'updated_at': remote['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+      'updated_at': _asUtcIso(remote['updated_at']?.toString() ?? ''),
       'medicines': remote['medicines']?.toString() ?? '',
     };
   }
 
   String _resolveUpdatedAt(Map<String, dynamic> row) {
     final updatedAt = row['updated_at'] as String?;
-    if (updatedAt != null && updatedAt.isNotEmpty) return updatedAt;
+    if (updatedAt != null && updatedAt.isNotEmpty) return _toUtcIso(updatedAt);
     final createdAt = row['created_at'] as String?;
-    if (createdAt != null && createdAt.isNotEmpty) return createdAt;
-    return DateTime.now().toIso8601String();
+    if (createdAt != null && createdAt.isNotEmpty) return _toUtcIso(createdAt);
+    return DateTime.now().toUtc().toIso8601String();
+  }
+
+  /// Converts a locally stored timestamp to UTC-aware ISO-8601. Naive values
+  /// (no timezone) are treated as device-local time, matching how local edits
+  /// are written, so the pushed timestamp carries the true instant.
+  String _toUtcIso(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return DateTime.now().toUtc().toIso8601String();
+    final dt = DateTime.tryParse(s);
+    return dt?.toUtc().toIso8601String() ?? DateTime.now().toUtc().toIso8601String();
+  }
+
+  /// Converts a remote/server timestamp to UTC-aware ISO-8601. Naive values
+  /// are treated as UTC (the server stores naive UTC timestamps).
+  String _asUtcIso(String raw) {
+    if (raw.trim().isEmpty) return DateTime.now().toUtc().toIso8601String();
+    final dt = _parseRemoteTimestamp(raw);
+    return dt?.toUtc().toIso8601String() ?? DateTime.now().toUtc().toIso8601String();
+  }
+
+  DateTime? _parseRemoteTimestamp(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final s = raw.trim();
+    final hasTimeZone = s.endsWith('Z') ||
+        s.endsWith('z') ||
+        RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(s);
+    if (hasTimeZone) return DateTime.tryParse(s);
+    return DateTime.tryParse('${s}Z');
   }
 
   Future<String> _loadOrCreateDeviceId() async {
@@ -740,7 +805,7 @@ class SyncManager extends ChangeNotifier {
     for (final json in remoteSettings) {
       try {
         final map = Map<String, dynamic>.from(json as Map);
-        final remoteUpdated = DateTime.tryParse(map['updated_at']?.toString() ?? '');
+        final remoteUpdated = _parseRemoteTimestamp(map['updated_at']?.toString());
         final existing = await _settingsRepo.getFirst();
         final localUpdated = DateTime.tryParse(existing?['updated_at'] as String? ?? '');
 
@@ -757,7 +822,7 @@ class SyncManager extends ChangeNotifier {
             'clinic_phone': map['clinic_phone']?.toString() ?? '',
             'website': map['website']?.toString() ?? '',
             'operating_hours': map['operating_hours']?.toString() ?? '',
-            'updated_at': map['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+            'updated_at': _asUtcIso(map['updated_at']?.toString() ?? ''),
           });
           applied++;
         }
@@ -774,7 +839,7 @@ class SyncManager extends ChangeNotifier {
         final date = map['note_date']?.toString() ?? '';
         if (date.isEmpty) continue;
 
-        final remoteUpdated = DateTime.tryParse(map['updated_at']?.toString() ?? '');
+        final remoteUpdated = _parseRemoteTimestamp(map['updated_at']?.toString());
         final existing = await _notesRepo.getByDate(date);
         final localUpdated = DateTime.tryParse(existing?['updated_at'] as String? ?? '');
 
@@ -786,7 +851,7 @@ class SyncManager extends ChangeNotifier {
             if (existing != null) {
               await _notesRepo.updateByDate(date, {
                 'note_text': noteText,
-                'updated_at': map['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+                'updated_at': _asUtcIso(map['updated_at']?.toString() ?? ''),
               });
             } else {
               await _notesRepo.insert({
@@ -794,7 +859,7 @@ class SyncManager extends ChangeNotifier {
                 'note_date': date,
                 'note_text': noteText,
                 'created_at': map['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-                'updated_at': map['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+                'updated_at': _asUtcIso(map['updated_at']?.toString() ?? ''),
               });
             }
           }

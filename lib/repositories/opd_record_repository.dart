@@ -24,13 +24,12 @@ class OpdRecordRepository {
   }
 
   Future<int> insert(Map<String, dynamic> row) async {
-    final now = DateTime.now().toIso8601String();
     final db = await _db;
     final cleanRow = Map<String, dynamic>.from(row)..remove('blood_group');
     return db.insert(tableOpdVisits, {
       ...cleanRow,
       'sync_status': cleanRow['sync_status'] ?? 'pending',
-      'updated_at': cleanRow['updated_at'] ?? cleanRow['created_at'] ?? now,
+      'updated_at': cleanRow['updated_at'] ?? cleanRow['created_at'] ?? DateTime.now().toUtc().toIso8601String(),
     });
   }
 
@@ -39,7 +38,7 @@ class OpdRecordRepository {
     final cleanRow = Map<String, dynamic>.from(row)..remove('blood_group');
     final affected = await db.update(tableOpdVisits, {
       ...cleanRow,
-      'updated_at': cleanRow['updated_at'] ?? DateTime.now().toIso8601String(),
+      'updated_at': cleanRow['updated_at'] ?? DateTime.now().toUtc().toIso8601String(),
     }, where: 'id = ?', whereArgs: [id]);
     print('OPD REPO UPDATE: id=$id affectedRows=$affected opd_id=${row['opd_id']} sql=${tableOpdVisits}');
     return affected;

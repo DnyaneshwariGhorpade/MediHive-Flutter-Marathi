@@ -39,6 +39,7 @@ class FirebaseMessagingService {
     _fcmToken = await _messaging?.getToken();
     if (_fcmToken != null) {
       await ApiService.updateFcmToken(_fcmToken!);
+      SyncManager().registerDeviceWithToken(_fcmToken!);
     }
   }
 
@@ -65,6 +66,7 @@ class FirebaseMessagingService {
       if (_fcmToken != null) {
         debugPrint('FCM token obtained: ${_fcmToken!.substring(0, 20)}...');
         await ApiService.updateFcmToken(_fcmToken!);
+        SyncManager().registerDeviceWithToken(_fcmToken!);
       }
     } catch (e) {
       debugPrint('FCM getToken error: $e');
@@ -76,6 +78,7 @@ class FirebaseMessagingService {
       _fcmToken = token;
       debugPrint('FCM token refreshed');
       ApiService.updateFcmToken(token);
+      SyncManager().registerDeviceWithToken(token);
     });
   }
 

@@ -13,6 +13,7 @@ import '../services/daily_summary_service.dart';
 import '../utils/sync_id_generator.dart';
 import '../repositories/sync_queue_repository.dart';
 import '../services/sync_manager.dart';
+import '../services/sync_refresh_bus.dart';
 
 class AppointmentProvider extends ChangeNotifier {
   final CalendarNotesRepository _notesRepo = CalendarNotesRepository();
@@ -77,6 +78,12 @@ class AppointmentProvider extends ChangeNotifier {
     _apptSubscription = Hive.box<AppointmentModel>('appointments').watch().listen((_) {
       _requestReload();
     });
+    SyncRefreshBus().addListener(_onSyncRefresh);
+  }
+
+  void _onSyncRefresh() {
+    _loadNotes();
+    _refreshHasRealData();
   }
 
   void _requestReload() {
@@ -369,10 +376,11 @@ class AppointmentProvider extends ChangeNotifier {
       final noteText = jsonEncode(notes);
       final existing = await _notesRepo.getByDate(sqlDate);
       final now = DateTime.now().toIso8601String();
+      final nowUtc = DateTime.now().toUtc().toIso8601String();
       if (existing != null) {
         await _notesRepo.update(existing['id'] as int, {
           'note_text': noteText,
-          'updated_at': now,
+          'updated_at': nowUtc,
         });
       } else {
         await _notesRepo.insert({
@@ -380,7 +388,7 @@ class AppointmentProvider extends ChangeNotifier {
           'note_date': sqlDate,
           'note_text': noteText,
           'created_at': now,
-          'updated_at': now,
+          'updated_at': nowUtc,
         });
       }
       await _addSyncQueueEntry('calendar_note', sqlDate);
@@ -406,6 +414,7 @@ class AppointmentProvider extends ChangeNotifier {
   @override
   void dispose() {
     _apptSubscription?.cancel();
+    SyncRefreshBus().removeListener(_onSyncRefresh);
     super.dispose();
   }
 }

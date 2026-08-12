@@ -317,7 +317,7 @@ static String get baseUrl =>
   }) async {
     await _loadToken();
     final res = await http.post(
-      Uri.parse('$cloudBaseUrl/cloud/register-device'),
+      Uri.parse('$baseUrl/sync/register-device'),
       headers: _headers(),
       body: jsonEncode({
         'device_id': deviceId,
@@ -385,7 +385,7 @@ static String get baseUrl =>
     await _loadToken();
     try {
       await http.post(
-        Uri.parse('$cloudBaseUrl/cloud/heartbeat'),
+        Uri.parse('$baseUrl/sync/heartbeat'),
         headers: _headers(),
         body: jsonEncode({'device_id': deviceId}),
       ).timeout(const Duration(seconds: 5));

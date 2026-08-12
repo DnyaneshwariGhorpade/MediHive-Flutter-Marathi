@@ -3,6 +3,7 @@ import '../models/collection_item.dart';
 import '../models/patient.dart';
 import '../repositories/opd_record_repository.dart';
 import '../repositories/patient_repository.dart';
+import '../services/sync_refresh_bus.dart';
 
 class DashboardProvider extends ChangeNotifier {
   final OpdRecordRepository _opdRepo = OpdRecordRepository();
@@ -33,6 +34,17 @@ class DashboardProvider extends ChangeNotifier {
 
   DashboardProvider() {
     loadDashboardData();
+    SyncRefreshBus().addListener(_onSyncRefresh);
+  }
+
+  void _onSyncRefresh() {
+    loadDashboardData();
+  }
+
+  @override
+  void dispose() {
+    SyncRefreshBus().removeListener(_onSyncRefresh);
+    super.dispose();
   }
 
   Future<void> refresh() async {

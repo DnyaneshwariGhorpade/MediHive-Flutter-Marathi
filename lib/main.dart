@@ -58,6 +58,12 @@ void main() async {
 
   print('MAIN START');
 
+  // Sync when the app returns to the foreground so changes from other
+  // devices are picked up promptly after the app was backgrounded.
+  if (!kIsWeb) {
+    WidgetsBinding.instance.addObserver(_AppLifecycleSyncObserver());
+  }
+
   try {
     print('CREATING SYNCMANAGER');
     SyncManager();
@@ -160,13 +166,19 @@ void main() async {
       }
     }
 
-    // Clear stale sync timestamps on every startup. This ensures that
-    // even if Android auto-backup restored old SharedPreferences (before
-    // allowBackup=false took effect), the next cloud sync will download
-    // from epoch and overwrite any restored local data via last-write-wins.
-    await startupPrefs.remove('last_cloud_sync');
-    await startupPrefs.remove('last_flask_sync');
-    debugPrint('MAIN: sync timestamps cleared — next sync will download all cloud data');
+    // Clear stale sync timestamps once per epoch. Older versions cleared the
+    // cursor on every cold start, forcing a full re-download each launch. We
+    // only need one full reset (guarded by an epoch counter) so a restored
+    // backup from the pre-allowBackup=false era is overwritten via LWW, while
+    // normal startups keep their incremental cursor.
+    const syncEpoch = 1;
+    final storedEpoch = startupPrefs.getInt('sync_epoch');
+    if (storedEpoch != syncEpoch) {
+      await startupPrefs.remove('last_cloud_sync');
+      await startupPrefs.remove('last_flask_sync');
+      await startupPrefs.setInt('sync_epoch', syncEpoch);
+      debugPrint('MAIN: sync timestamps cleared (epoch reset) — next sync will download all cloud data');
+    }
 
     // Initialize local notification services
   if (!kIsWeb) {
@@ -202,6 +214,17 @@ void main() async {
   }
 
   runApp(const MediHiveApp());
+}
+
+/// Forces a sync when the app returns to the foreground, so changes made on
+/// other devices are pulled promptly instead of waiting for the next poll.
+class _AppLifecycleSyncObserver with WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      SyncManager().forceSyncNow();
+    }
+  }
 }
 
 class MediHiveApp extends StatelessWidget {

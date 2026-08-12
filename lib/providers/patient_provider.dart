@@ -8,6 +8,7 @@ import '../repositories/patient_repository.dart';
 import '../repositories/sync_queue_repository.dart';
 import '../utils/sync_id_generator.dart';
 import '../services/sync_manager.dart';
+import '../services/sync_refresh_bus.dart';
 import '../services/cloud_sync_manager.dart';
 import '../repositories/opd_record_repository.dart';
 
@@ -62,11 +63,17 @@ class PatientProvider extends ChangeNotifier {
 
   PatientProvider() {
     loadPatients();
+    SyncRefreshBus().addListener(_onSyncRefresh);
+  }
+
+  void _onSyncRefresh() {
+    loadPatients();
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    SyncRefreshBus().removeListener(_onSyncRefresh);
     super.dispose();
   }
 

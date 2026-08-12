@@ -15,7 +15,7 @@ from models.device_registry import DeviceRegistry
 import os
 import tempfile
 from database import get_db
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from config import IMAGE_STORAGE_PATH, IS_CLOUD
 from services.log_service import get_logger
@@ -24,6 +24,47 @@ from routes.opd import save_images_locally, build_sheet_row_data, _ImageRecord
 logger = get_logger(__name__)
 
 sync_bp = Blueprint('sync', __name__)
+
+
+def _parse_ts(value):
+    """Parse an ISO-8601 timestamp into a naive UTC datetime.
+
+    Naive values (no timezone info) are treated as UTC, matching how the
+    server stores timestamps. Returns None for unparseable/empty input.
+    """
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    except (ValueError, TypeError):
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def _norm_utc(value):
+    """Normalize a timestamp to a naive UTC ISO-8601 string, or None."""
+    dt = _parse_ts(value)
+    return dt.isoformat() if dt else None
+
+
+def _remote_newer_or_equal(remote_updated, local_updated):
+    """Last-write-wins comparison (timezone-safe).
+
+    Returns True when the remote record may be written (remote is newer than
+    or equal to local). Missing timestamps are treated as 'older'; when both
+    are missing the remote wins so data is never silently dropped.
+    """
+    if not remote_updated:
+        return not local_updated
+    remote_dt = _parse_ts(remote_updated)
+    if remote_dt is None:
+        return not local_updated
+    if not local_updated:
+        return True
+    local_dt = _parse_ts(local_updated)
+    return local_dt is None or remote_dt >= local_dt
 
 
 def _get_user_clinic_id(user_id):
@@ -135,7 +176,7 @@ def _upsert_clinic_settings(clinic_id, payload, now):
 
     Returns (row_dict_or_None, conflict_message_or_None).
     """
-    remote_updated = payload.get('updated_at') or now
+    remote_updated = _norm_utc(payload.get('updated_at')) or now
     db = get_db()
     try:
         row = db.execute(
@@ -146,7 +187,7 @@ def _upsert_clinic_settings(clinic_id, payload, now):
         fields = {f: payload.get(f, '') or '' for f in _CLINIC_SETTINGS_FIELDS}
         if row is not None:
             local_updated = row.get('updated_at') or row.get('created_at') or ''
-            if local_updated and remote_updated < local_updated:
+            if not _remote_newer_or_equal(remote_updated, local_updated):
                 return dict(row), (
                     f"clinic_settings update skipped: local record is newer "
                     f"(local={local_updated}, remote={remote_updated})"
@@ -197,15 +238,15 @@ def _upsert_calendar_note(clinic_id, user_id, payload, now):
             DeletedEntity.record('calendar_note', note_date, user_id=user_id, clinic_id=clinic_id)
             return {'note_date': note_date, 'deleted': True}, None
 
-        remote_created = payload.get('created_at') or now
-        remote_updated = payload.get('updated_at') or now
+        remote_created = _norm_utc(payload.get('created_at')) or now
+        remote_updated = _norm_utc(payload.get('updated_at')) or now
         row = db.execute(
             "SELECT * FROM calendar_notes WHERE note_date = %s AND clinic_id = %s",
             (note_date, clinic_id),
         ).fetchone()
         if row is not None:
             local_updated = row.get('updated_at') or row.get('created_at') or ''
-            if local_updated and remote_updated < local_updated:
+            if not _remote_newer_or_equal(remote_updated, local_updated):
                 return dict(row), (
                     f"calendar_note {note_date} update skipped: local record is newer "
                     f"(local={local_updated}, remote={remote_updated})"
@@ -381,7 +422,7 @@ def sync_upload():
         if existing:
             remote_updated = p.get('updated_at', '')
             local_updated = existing.get('updated_at', '')
-            if remote_updated >= local_updated:
+            if _remote_newer_or_equal(remote_updated, local_updated):
                 Patient.update(p['id'], p, clinic_id=clinic_id)
                 results['patients'].append(_format_patient(Patient.get(p['id'], clinic_id=clinic_id)))
                 events_to_enqueue.append(('patient', p['id'], 'upsert'))
@@ -422,7 +463,7 @@ def sync_upload():
         if existing:
             remote_updated = r.get('updated_at', '')
             local_updated = existing.get('updated_at', '')
-            if remote_updated >= local_updated:
+            if _remote_newer_or_equal(remote_updated, local_updated):
                 OPDRecord.update(r['id'], r, clinic_id=clinic_id)
                 result = OPDRecord.get(r['id'], clinic_id=clinic_id)
                 events_to_enqueue.append(('opd_visit', r['id'], 'upsert'))
@@ -458,7 +499,7 @@ def sync_upload():
         if existing:
             remote_updated = a.get('updated_at', '')
             local_updated = existing.get('updated_at', '')
-            if remote_updated >= local_updated:
+            if _remote_newer_or_equal(remote_updated, local_updated):
                 Appointment.update(a['id'], a, clinic_id=clinic_id)
                 results['appointments'].append(Appointment.get(a['id'], clinic_id=clinic_id))
                 events_to_enqueue.append(('appointment', a['id'], 'upsert'))

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../theme/app_theme.dart';
 import '../services/google_auth_service.dart';
 import '../services/sync_manager.dart';
+import '../services/sync_refresh_bus.dart';
 import '../repositories/clinic_settings_repository.dart';
 import '../repositories/sync_queue_repository.dart';
 import '../utils/sync_id_generator.dart';
@@ -75,6 +76,11 @@ class SettingsProvider extends ChangeNotifier {
     _loadSettings();
     _checkGoogleSignInStatus();
     _listenToAuthChanges();
+    SyncRefreshBus().addListener(_onSyncRefresh);
+  }
+
+  void _onSyncRefresh() {
+    _loadSettings();
   }
 
   void _listenToAuthChanges() {
@@ -243,7 +249,7 @@ class SettingsProvider extends ChangeNotifier {
       'website': _clinicWebsite,
       'clinic_logo_path': _clinicLogoPath,
       'operating_hours': _clinicHours,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     });
   }
 
@@ -322,6 +328,7 @@ class SettingsProvider extends ChangeNotifier {
   @override
   void dispose() {
     _googleAuthSub?.cancel();
+    SyncRefreshBus().removeListener(_onSyncRefresh);
     super.dispose();
   }
 

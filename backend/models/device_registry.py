@@ -31,6 +31,25 @@ class DeviceRegistry:
         return [DeviceRegistry.dict_from_row(r) for r in rows]
 
     @staticmethod
+    def get_notifiable(clinic_id):
+        """Devices that can receive sync_trigger pushes for a clinic.
+
+        Matches the exact clinic_id, plus legacy rows that were registered
+        without a clinic_id ('' or NULL), so devices registered before the
+        clinic_id fix still get notified.
+        """
+        db = get_db()
+        rows = db.execute(
+            "SELECT * FROM device_registry "
+            "WHERE fcm_token IS NOT NULL AND fcm_token != '' "
+            "AND (clinic_id = %s OR clinic_id = '' OR clinic_id IS NULL) "
+            "ORDER BY last_seen DESC",
+            (clinic_id,)
+        ).fetchall()
+        db.close()
+        return [DeviceRegistry.dict_from_row(r) for r in rows]
+
+    @staticmethod
     def register(data):
         now = datetime.utcnow().isoformat()
         db = get_db()
