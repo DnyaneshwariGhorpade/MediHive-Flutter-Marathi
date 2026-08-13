@@ -164,7 +164,7 @@ def _init_db():
     if _db_initialized:
         return
 
-    logger.critical("MIGRATION_TEST: init_db executed with panchakarma migration")
+    logger.info("Database initialized successfully")
     pool_obj = get_pool()
     conn = pool_obj.getconn()
     db = DBConnection(conn)
