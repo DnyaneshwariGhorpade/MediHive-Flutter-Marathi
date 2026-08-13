@@ -86,8 +86,14 @@ class SyncWorkerThread(threading.Thread):
               AND (
                 retry_count = 0 
                 OR last_attempt IS NULL 
-                OR NOT (last_attempt LIKE 'origin_device_id:%%')
-                OR EXTRACT(EPOCH FROM timezone('utc', now())) - EXTRACT(EPOCH FROM last_attempt::timestamp) > POWER(2, retry_count) * 15
+                OR last_attempt LIKE 'origin_device_id:%%'
+                OR (
+                    CASE 
+                        WHEN last_attempt NOT LIKE 'origin_device_id:%%' 
+                        THEN EXTRACT(EPOCH FROM timezone('utc', now())) - EXTRACT(EPOCH FROM last_attempt::timestamp)
+                        ELSE 999999
+                    END
+                ) > POWER(2, retry_count) * 15
               )
             ORDER BY id ASC
             LIMIT 1
