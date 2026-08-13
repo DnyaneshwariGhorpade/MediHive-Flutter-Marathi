@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
@@ -40,7 +41,7 @@ class OpdRecordRepository {
       ...cleanRow,
       'updated_at': cleanRow['updated_at'] ?? DateTime.now().toUtc().toIso8601String(),
     }, where: 'id = ?', whereArgs: [id]);
-    print('OPD REPO UPDATE: id=$id affectedRows=$affected opd_id=${row['opd_id']} sql=${tableOpdVisits}');
+    debugPrint('OPD REPO UPDATE: id=$id affectedRows=$affected opd_id=${row['opd_id']} sql=$tableOpdVisits');
     return affected;
   }
 

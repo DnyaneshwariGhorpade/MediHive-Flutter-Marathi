@@ -532,8 +532,12 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
                           } else {
                             if (_isSubmitting) return;
                             setState(() => _isSubmitting = true);
-                            print('OPD SAVE START');
+                            debugPrint('OPD SAVE START');
                             try {
+                              final dashboardProvider = context.read<DashboardProvider>();
+                              final appointmentProvider = context.read<AppointmentProvider>();
+                              final notificationProvider = context.read<NotificationProvider>();
+
                               await context
                                   .read<PatientProvider>()
                                   .addPatientFromOpd(opd.formData);
@@ -542,11 +546,11 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
                                   opd.formData.name;
                               // Find existing record ID if editing
                               String? existingId;
-                              print('OPD SAVE: editPatientId="${widget.editPatientId}" editOpdId="${widget.editOpdId}"');
+                              debugPrint('OPD SAVE: editPatientId="${widget.editPatientId}" editOpdId="${widget.editOpdId}"');
                               if (widget.editOpdId != null &&
                                   widget.editOpdId!.isNotEmpty) {
                                 existingId = widget.editOpdId;
-                                print('OPD SAVE: using direct editOpdId=$existingId');
+                                debugPrint('OPD SAVE: using direct editOpdId=$existingId');
                               } else if (widget.editPatientId != null &&
                                   widget.editPatientId!.isNotEmpty) {
                                 final patientSyncId = widget.editPatientId!;
@@ -558,42 +562,40 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
                                   final opdRepo = OpdRecordRepository();
                                   final records = await opdRepo
                                       .getByPatientId(sqlitePatientId);
-                                  print('OPD SAVE: patientRecords=${records.length}');
+                                  debugPrint('OPD SAVE: patientRecords=${records.length}');
                                   if (records.isNotEmpty) {
                                     final firstOpdId =
                                         records.first['opd_id']?.toString();
-                                    print(
+                                    debugPrint(
                                         'OPD SAVE: firstRecord opd_id=$firstOpdId');
                                     if (firstOpdId != null &&
                                         firstOpdId.isNotEmpty) {
                                       existingId = firstOpdId;
                                     } else {
-                                      print(
+                                      debugPrint(
                                           'OPD SAVE WARNING: first record has null/empty opd_id');
                                     }
                                   } else {
-                                    print(
+                                    debugPrint(
                                         'OPD SAVE WARNING: no OPD records found for patient sqlitePatientId=$sqlitePatientId');
                                   }
                                 } else {
-                                  print(
+                                  debugPrint(
                                       'OPD SAVE WARNING: patient not found by syncId=$patientSyncId');
                                 }
                               } else {
-                                print(
+                                debugPrint(
                                     'OPD SAVE: editPatientId is null/empty — will CREATE new OPD');
                               }
-                              print('OPD SAVE: existingId=$existingId');
+                              debugPrint('OPD SAVE: existingId=$existingId');
                               final success = await opd.submitRecord(
-                                dashboardProvider: context
-                                    .read<DashboardProvider>(),
-                                appointmentProvider: context
-                                    .read<AppointmentProvider>(),
+                                dashboardProvider: dashboardProvider,
+                                appointmentProvider: appointmentProvider,
                                 existingRecordId: existingId,
                                 documentBytes: _documentBytes,
                               );
                               if (!success) {
-                                setState(() => _isSubmitting = false);
+                                if (mounted) setState(() => _isSubmitting = false);
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -604,15 +606,16 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
                                 }
                                 return;
                               }
-                              context.read<NotificationProvider>().addNotification(
+                              notificationProvider.addNotification(
                                 'OPD Record Saved',
                                 'Patient $patientNameForNotification record saved',
                               );
                             } catch (e) {
-                              setState(() => _isSubmitting = false);
+                              if (mounted) setState(() => _isSubmitting = false);
                               rethrow;
                             }
 
+                            if (!context.mounted) return;
                             showGeneralDialog(
                               context: context,
                               barrierColor: Colors.black.withValues(
@@ -1657,8 +1660,9 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
             isRequired: true,
             validator: (value) {
               if (value == null || value.trim().isEmpty) return l10n.required;
-              if (double.tryParse(value.trim()) == null)
+              if (double.tryParse(value.trim()) == null) {
                 return l10n.mustBeValidNumber;
+              }
               return null;
             },
           ),
@@ -1689,7 +1693,7 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: opd.formData.discountType,
+            initialValue: opd.formData.discountType,
             decoration: InputDecoration(
               labelText: l10n.discountType,
               labelStyle: TextStyle(color: AppTheme.textSecondary),

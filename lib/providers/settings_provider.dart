@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter/foundation.dart';
 import '../theme/app_theme.dart';
 import '../services/google_auth_service.dart';
 import '../services/sync_manager.dart';
@@ -45,7 +44,6 @@ class SettingsProvider extends ChangeNotifier {
   bool _isSyncEnabled = false;
   bool _isSyncing = false;
   StreamSubscription? _googleAuthSub;
-  int _authRefreshAttempts = 0;
 
   // Getters
   bool get darkMode => _darkMode;
@@ -124,7 +122,6 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final account = await _googleAuthService.signInWithGoogle();
       _googleUser = account;
-      _authRefreshAttempts = 0;
       if (account != null) {
         _isSyncEnabled = true;
         final prefs = await SharedPreferences.getInstance();
@@ -147,7 +144,6 @@ class SettingsProvider extends ChangeNotifier {
       await _googleAuthService.signOut();
       _googleUser = null;
       _isSyncEnabled = false;
-      _authRefreshAttempts = 0;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isSyncEnabled', false);
       await prefs.remove('lastSyncTime');
@@ -197,7 +193,6 @@ class SettingsProvider extends ChangeNotifier {
       _googleUser = _googleAuthService.currentUser;
 
       _googleAuthError = null;
-      _authRefreshAttempts = 0;
 
       final now = DateTime.now();
       final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

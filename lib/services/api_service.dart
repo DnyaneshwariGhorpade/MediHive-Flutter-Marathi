@@ -396,12 +396,12 @@ static String get baseUrl =>
     String opdId,
     List<File> images,
   ) async {
-    print('API pushImages ENTER: opdId=$opdId fileCount=${images.length}');
+    debugPrint('API pushImages ENTER: opdId=$opdId fileCount=${images.length}');
     await _loadToken();
-    print('API pushImages: token loaded, token=${_token?.substring(0, 20)}...');
+    debugPrint('API pushImages: token loaded, token=${_token != null && _token!.length >= 20 ? _token!.substring(0, 20) : _token}...');
 
     final uri = Uri.parse('$baseUrl/sync/push/images/$opdId');
-    print('API pushImages: uri=$uri');
+    debugPrint('API pushImages: uri=$uri');
 
     final request = http.MultipartRequest('POST', uri);
     request.headers['Authorization'] = 'Bearer $_token';
@@ -409,38 +409,38 @@ static String get baseUrl =>
     for (int i = 0; i < images.length; i++) {
       final image = images[i];
       final fileLen = await image.length();
-      print('API pushImages: adding file[$i] path=${image.path} size=$fileLen');
+      debugPrint('API pushImages: adding file[$i] path=${image.path} size=$fileLen');
       request.files.add(
         await http.MultipartFile.fromPath('images', image.path),
       );
     }
 
-    print('API pushImages: sending request...');
+    debugPrint('API pushImages: sending request...');
     final stopwatch = Stopwatch()..start();
     try {
       final streamedResponse = await request.send().timeout(const Duration(seconds: 120));
       final response = await http.Response.fromStream(streamedResponse).timeout(const Duration(seconds: 120));
       stopwatch.stop();
-      print('API pushImages: response received in ${stopwatch.elapsedMilliseconds}ms status=${response.statusCode}');
-      print('API pushImages: response body=${response.body}');
+      debugPrint('API pushImages: response received in ${stopwatch.elapsedMilliseconds}ms status=${response.statusCode}');
+      debugPrint('API pushImages: response body=${response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        print('API pushImages: SUCCESS - opdId=$opdId drive_urls=${decoded['drive_urls']}');
+        debugPrint('API pushImages: SUCCESS - opdId=$opdId drive_urls=${decoded['drive_urls']}');
         return decoded;
       }
 
       final errorBody = response.body.isNotEmpty
           ? (jsonDecode(response.body)['error']?.toString() ?? 'Unknown error')
           : 'Empty response';
-      print('API pushImages: FAILED - status=${response.statusCode} error=$errorBody');
+      debugPrint('API pushImages: FAILED - status=${response.statusCode} error=$errorBody');
       throw ApiException(
         response.statusCode,
         errorBody,
       );
     } catch (e) {
       stopwatch.stop();
-      print('API pushImages: EXCEPTION after ${stopwatch.elapsedMilliseconds}ms: $e');
+      debugPrint('API pushImages: EXCEPTION after ${stopwatch.elapsedMilliseconds}ms: $e');
       rethrow;
     }
   }

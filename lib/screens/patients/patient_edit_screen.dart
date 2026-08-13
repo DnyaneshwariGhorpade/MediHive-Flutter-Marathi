@@ -99,7 +99,7 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
       }
       final sqliteId = _patientRow!['id'] as int;
       final patientSyncId = _patientRow!['sync_id'] as String? ?? '';
-      print('PATIENT EDIT SAVE: patientSyncId=$patientSyncId sqliteId=$sqliteId');
+      debugPrint('PATIENT EDIT SAVE: patientSyncId=$patientSyncId sqliteId=$sqliteId');
 
       final repo = PatientRepository();
       final syncQueueRepo = SyncQueueRepository();
@@ -119,9 +119,9 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
         'blood_group': _bloodGroup,
         'weight': weight,
       };
-      print('PATIENT EDIT SAVE: updating with $updateData');
+      debugPrint('PATIENT EDIT SAVE: updating with $updateData');
       final affected = await repo.update(sqliteId, updateData);
-      print('PATIENT EDIT SAVE: affectedRows=$affected');
+      debugPrint('PATIENT EDIT SAVE: affectedRows=$affected');
 
       final syncEntityId = patientSyncId.isNotEmpty ? patientSyncId : widget.patientId;
       await syncQueueRepo.insert({
@@ -132,9 +132,9 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
         'retry_count': 0,
         'created_at': DateTime.now().toIso8601String(),
       });
-      print('PATIENT EDIT SAVE: sync queue entry created for $syncEntityId');
+      debugPrint('PATIENT EDIT SAVE: sync queue entry created for $syncEntityId');
       Future.microtask(() {
-        print('FORCING IMMEDIATE SYNC');
+        debugPrint('FORCING IMMEDIATE SYNC');
         SyncManager().forceSyncNow();
       });
 

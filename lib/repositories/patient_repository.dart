@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 import '../database/schema.dart';
@@ -76,7 +77,7 @@ class PatientRepository {
       ...row,
       'updated_at': row['updated_at'] ?? DateTime.now().toUtc().toIso8601String(),
     }, where: 'id = ?', whereArgs: [id]);
-    print('PATIENT REPO UPDATE: id=$id affectedRows=$affected');
+    debugPrint('PATIENT REPO UPDATE: id=$id affectedRows=$affected');
     return affected;
   }
 

@@ -170,27 +170,31 @@ class _BackupScreenState extends State<BackupScreen> {
     );
   }
 
-  Future<void> _selectBackupTime(BuildContext context, SyncManager syncMgr) async {
+  Future<void> _selectBackupTime(BuildContext pickerContext, SyncManager syncMgr) async {
+    final l10n = AppLocalizations.of(pickerContext)!;
     final selected = await showTimePicker(
-      context: context,
+      context: pickerContext,
       initialTime: _backupTime,
     );
     if (selected != null) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('backup_hour', selected.hour);
       await prefs.setInt('backup_minute', selected.minute);
+      if (!mounted) return;
       setState(() {
         _backupTime = selected;
         _backupTimeStr = _formatTimeOfDay(selected);
       });
       await syncMgr.scheduleDailyBackup(selected);
-      _showToast('✓ ${AppLocalizations.of(context)!.backupScheduledAt(_backupTimeStr)}');
+      if (!mounted) return;
+      _showToast('✓ ${l10n.backupScheduledAt(_backupTimeStr)}');
     }
   }
 
   Future<void> _shareBackup() async {
     try {
-      _showToast(AppLocalizations.of(context)!.preparingBackupToShare);
+      final l10n = AppLocalizations.of(context)!;
+      _showToast(l10n.preparingBackupToShare);
       final bytes = await ExcelExportService().generateExcelFile();
       final fileName = ExcelExportService().generateFileName('Shree_Clinic');
       
@@ -200,9 +204,10 @@ class _BackupScreenState extends State<BackupScreen> {
 
       await Share.shareXFiles(
         [XFile(tempFile.path)],
-        text: AppLocalizations.of(context)!.shareBackupText,
+        text: l10n.shareBackupText,
       );
     } catch (e) {
+      if (!mounted) return;
       _showToast(AppLocalizations.of(context)!.shareFailed(e.toString()), isError: true);
     }
   }
@@ -220,7 +225,7 @@ class _BackupScreenState extends State<BackupScreen> {
         ),
         content: Text(
           AppLocalizations.of(context)!.restoreWarning,
-          style: TextStyle(height: 1.4),
+          style: const TextStyle(height: 1.4),
         ),
         actions: [
           TextButton(
@@ -229,8 +234,8 @@ class _BackupScreenState extends State<BackupScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                                                  backgroundColor: AppTheme.danger,
-                                                  foregroundColor: AppTheme.textOnPrimary,
+              backgroundColor: AppTheme.danger,
+              foregroundColor: AppTheme.textOnPrimary,
             ),
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(AppLocalizations.of(context)!.restoreDataBtn),
@@ -245,34 +250,78 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   Future<void> _performRestore(DriveBackupInfo backup) async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _isRestoring = true;
-      _restoreProgressStr = AppLocalizations.of(context)!.downloadingBackup;
+      _restoreProgressStr = l10n.downloadingBackup;
     });
 
     try {
       final bytes = await GoogleDriveSyncService().downloadBackupBytes(backup.id);
       
       final recordCount = _parseRecordCount(backup.name);
+      if (!mounted) return;
       setState(() {
-        _restoreProgressStr = AppLocalizations.of(context)!.restoringNRecords(recordCount);
+        _restoreProgressStr = l10n.restoringNRecords(recordCount);
       });
 
       final restored = await ExcelRestoreService().restoreFromExcel(bytes);
       
+      if (!mounted) return;
       setState(() {
         _isRestoring = false;
         _restoreProgressStr = '';
       });
 
-      _showToast('✓ ${AppLocalizations.of(context)!.restoredNRecords(restored)}');
+      _showToast('✓ ${l10n.restoredNRecords(restored)}');
       _fetchCloudBackupHistory();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isRestoring = false;
         _restoreProgressStr = '';
       });
-      _showToast(AppLocalizations.of(context)!.restoreFailed(e.toString()), isError: true);
+      _showToast(l10n.restoreFailed(e.toString()), isError: true);
+    }
+  }
+
+  Future<void> _exportLocalBackup(String p, AppLocalizations l10n, SyncManager syncMgr) async {
+    setState(() => _showDropdown = false);
+    try {
+      _showToast(l10n.generatingBackup(p));
+      final bytes = await ExcelExportService().generateExcelFile();
+      final suffix = p.replaceAll(' ', '_').toLowerCase();
+      final fileName = ExcelExportService().generateFileName('Shree_Clinic')
+          .replaceAll('.xlsx', '_$suffix.xlsx');
+
+      final appDir = await getApplicationDocumentsDirectory();
+      final path = '${appDir.path}/$fileName';
+
+      final file = File(path);
+      await file.writeAsBytes(bytes);
+      if (!mounted) return;
+      _showToast(l10n.backupSavedLocally(fileName));
+
+      if (syncMgr.syncState != SyncState.offline) {
+        if (!mounted) return;
+        final upload = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.uploadToDriveQuestion),
+            content: Text(l10n.backupSavedUploadPrompt),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.no)),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.upload)),
+            ],
+          ),
+        );
+        if (upload == true) {
+          await syncMgr.backupToDriveOnly();
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showToast(l10n.backupGenFailed(e.toString()), isError: true);
     }
   }
 
@@ -433,43 +482,7 @@ class _BackupScreenState extends State<BackupScreen> {
                                 ),
                                 child: Column(
                                   children: [l10n.month1Period, l10n.months3Period, l10n.months6Period, l10n.months12Period, l10n.completeBackup].map((p) => InkWell(
-                                    onTap: () async {
-                                      setState(() => _showDropdown = false);
-                                      try {
-                                        _showToast(l10n.generatingBackup(p));
-                                        final bytes = await ExcelExportService().generateExcelFile();
-                                        final suffix = p.replaceAll(' ', '_').toLowerCase();
-                                        final fileName = ExcelExportService().generateFileName('Shree_Clinic')
-                                            .replaceAll('.xlsx', '_$suffix.xlsx');
-
-                                        final appDir = await getApplicationDocumentsDirectory();
-                                        final path = '${appDir.path}/$fileName';
-
-                                        final file = File(path);
-                                        await file.writeAsBytes(bytes);
-                                        _showToast(l10n.backupSavedLocally(fileName));
-
-                                        final syncMgr = context.read<SyncManager>();
-                                        if (syncMgr.syncState != SyncState.offline) {
-                                          final upload = await showDialog<bool>(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: Text(l10n.uploadToDriveQuestion),
-                                              content: Text(l10n.backupSavedUploadPrompt),
-                                              actions: [
-                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.no)),
-                                                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.upload)),
-                                              ],
-                                            ),
-                                          );
-                                          if (upload == true) {
-                                            await syncMgr.backupToDriveOnly();
-                                          }
-                                        }
-                                      } catch (e) {
-                                        _showToast(l10n.backupGenFailed(e.toString()), isError: true);
-                                      }
-                                    },
+                                    onTap: () => _exportLocalBackup(p, l10n, context.read<SyncManager>()),
                                     child: Container(
                                       width: double.infinity,
                                       padding: const EdgeInsets.all(14),

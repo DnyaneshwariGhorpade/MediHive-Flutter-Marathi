@@ -145,7 +145,7 @@ class AppointmentProvider extends ChangeNotifier {
     }
   }
 
-  bool get _hasRealData => _hasRealDataCached;
+  bool get hasRealData => _hasRealDataCached;
 
   List<Appointment> get upcomingFollowUps {
     final now = DateTime.now();

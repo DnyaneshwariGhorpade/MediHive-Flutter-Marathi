@@ -198,7 +198,7 @@ class PatientProvider extends ChangeNotifier {
         recordId: patientId,
       );
       Future.microtask(() {
-        print('FORCING IMMEDIATE SYNC');
+        debugPrint('FORCING IMMEDIATE SYNC');
         SyncManager().forceSyncNow();
       });
       await loadPatients();
@@ -243,12 +243,12 @@ class PatientProvider extends ChangeNotifier {
           'address': formData.address.isNotEmpty ? formData.address : existing['address'],
           'weight': formData.weight.isNotEmpty ? double.tryParse(formData.weight) : existing['weight'],
         };
-        print('PATIENT ADD: updating patient id=${existing['id']} syncId=${formData.patientId}');
-        print('PATIENT ADD: name="${updateData['full_name']}" gender="${updateData['gender']}" mobile="${updateData['mobile_number']}"');
+        debugPrint('PATIENT ADD: updating patient id=${existing['id']} syncId=${formData.patientId}');
+        debugPrint('PATIENT ADD: name="${updateData['full_name']}" gender="${updateData['gender']}" mobile="${updateData['mobile_number']}"');
         final affected = await _repo.update(existing['id'] as int, updateData);
-        print('PATIENT ADD: update affectedRows=$affected');
+        debugPrint('PATIENT ADD: update affectedRows=$affected');
         if (affected == 0) {
-          print('PATIENT ADD CRITICAL: UPDATE affected 0 rows!');
+          debugPrint('PATIENT ADD CRITICAL: UPDATE affected 0 rows!');
         }
         await _addSyncQueueEntry('patient', formData.patientId);
         CloudSyncManager().notifyChange(
@@ -257,13 +257,13 @@ class PatientProvider extends ChangeNotifier {
           recordId: formData.patientId,
         );
         await loadPatients();
-        print('PATIENT ADD: loadPatients() completed');
+        debugPrint('PATIENT ADD: loadPatients() completed');
         return;
       } else {
-        print('PATIENT ADD: existing patient NOT FOUND for syncId=${formData.patientId}');
+        debugPrint('PATIENT ADD: existing patient NOT FOUND for syncId=${formData.patientId}');
       }
     } else {
-      print('PATIENT ADD: formData.patientId is empty — will create new patient');
+      debugPrint('PATIENT ADD: formData.patientId is empty — will create new patient');
     }
 
     final nextId = await generateNextPatientId();

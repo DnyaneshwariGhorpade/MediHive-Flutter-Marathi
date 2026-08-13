@@ -57,12 +57,12 @@ void main() async {
 
   try {
     await dotenv.load(fileName: "assets/.env");
-    print('DOTENV LOADED SUCCESSFULLY');
+    debugPrint('DOTENV LOADED SUCCESSFULLY');
   } catch (e) {
-    print('DOTENV LOAD FAILED: $e');
+    debugPrint('DOTENV LOAD FAILED: $e');
   }
 
-  print('MAIN START');
+  debugPrint('MAIN START');
 
   // Sync when the app returns to the foreground so changes from other
   // devices are picked up promptly after the app was backgrounded.
@@ -71,12 +71,12 @@ void main() async {
   }
 
   try {
-    print('CREATING SYNCMANAGER');
+    debugPrint('CREATING SYNCMANAGER');
     SyncManager();
-    print('SYNCMANAGER CREATED');
+    debugPrint('SYNCMANAGER CREATED');
   } catch (e, st) {
-    print('SYNCMANAGER FAILED: $e');
-    print(st);
+    debugPrint('SYNCMANAGER FAILED: $e');
+    debugPrint(st.toString());
   }
 
   // Start cloud sync manager (runs in background, polls every 20s)
@@ -197,7 +197,7 @@ void main() async {
   // Schedule background tasks (native only)
   if (!kIsWeb) {
     try {
-      print('CREATING SYNCMANAGER');
+      debugPrint('CREATING SYNCMANAGER');
       final syncManager = SyncManager();
       await syncManager.scheduleDailyBackup(const TimeOfDay(hour: 2, minute: 0));
     } catch (e) {
@@ -250,7 +250,7 @@ class MediHiveApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AppointmentProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) {
-          print('CREATING SYNCMANAGER');
+          debugPrint('CREATING SYNCMANAGER');
           return SyncManager();
         }),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),

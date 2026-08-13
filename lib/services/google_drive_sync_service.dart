@@ -30,7 +30,7 @@ import '../repositories/sync_queue_repository.dart';
 //    If any future code adds a call to syncPendingRecords() in
 //    _trySync() or triggerManualSync(), it will be rejected.
 // ────────────────────────────────────────────────────────────────
-const bool PERMANENTLY_DISABLE_AUTO_XLSX_CREATION = true;
+const bool permanentlyDisableAutoXlsxCreation = true;
 
 // ─── Custom Exceptions ─────────────────────────────────────────
 
