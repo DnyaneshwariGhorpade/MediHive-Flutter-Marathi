@@ -84,11 +84,10 @@ def _build_row(data: dict) -> list:
 
 def _load_sheet_id_from_db():
     try:
-        db = get_db()
-        row = db.execute(
-            "SELECT value FROM settings WHERE key = 'spreadsheet_id'"
-        ).fetchone()
-        db.close()
+        with get_db() as db:
+            row = db.execute(
+                "SELECT value FROM settings WHERE key = 'spreadsheet_id'"
+            ).fetchone()
         if row and row['value']:
             sid = row['value']
             logger.info("Loaded sheet ID from database: %s", sid)
@@ -498,14 +497,13 @@ def clear_opd_sheet_data():
     _apply_opd_formatting(ws)
 
     try:
-        db = get_db()
-        db.execute("DELETE FROM opd_records")
-        db.execute("DELETE FROM patients")
-        db.execute("DELETE FROM deleted_entities")
-        db.execute("DELETE FROM last_sync")
-        db.execute("DELETE FROM settings WHERE key = 'spreadsheet_id'")
-        db.commit()
-        db.close()
+        with get_db() as db:
+            db.execute("DELETE FROM opd_records")
+            db.execute("DELETE FROM patients")
+            db.execute("DELETE FROM deleted_entities")
+            db.execute("DELETE FROM last_sync")
+            db.execute("DELETE FROM settings WHERE key = 'spreadsheet_id'")
+            db.commit()
         logger.info("Backend database cleared (opd_records, patients, deleted_entities, last_sync)")
     except Exception as e:
         logger.error("Failed to clear backend database: %s", e)

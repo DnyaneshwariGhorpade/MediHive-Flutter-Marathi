@@ -50,11 +50,10 @@ def send_push_notification(token: str, title: str, body: str, data: dict = None)
 
 
 def send_push_to_all_users(title: str, body: str, data: dict = None):
-    db = get_db()
-    rows = db.execute(
-        "SELECT fcm_token FROM fcm_tokens WHERE fcm_token IS NOT NULL AND fcm_token != ''"
-    ).fetchall()
-    db.close()
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT fcm_token FROM fcm_tokens WHERE fcm_token IS NOT NULL AND fcm_token != ''"
+        ).fetchall()
     sent = 0
     for row in rows:
         if send_push_notification(row["fcm_token"], title, body, data):
@@ -64,30 +63,28 @@ def send_push_to_all_users(title: str, body: str, data: dict = None):
 
 
 def save_fcm_token(token: str, user_id: str = None):
-    db = get_db()
-    existing = db.execute(
-        "SELECT id FROM fcm_tokens WHERE fcm_token = %s", (token,)
-    ).fetchone()
-    if existing:
-        db.execute(
-            "UPDATE fcm_tokens SET updated_at = NOW(), user_id = COALESCE(%s, user_id) WHERE fcm_token = %s",
-            (user_id, token),
-        )
-    else:
-        db.execute(
-            "INSERT INTO fcm_tokens (fcm_token, user_id, created_at, updated_at) VALUES (%s, %s, NOW(), NOW())",
-            (token, user_id),
-        )
-    db.commit()
-    db.close()
+    with get_db() as db:
+        existing = db.execute(
+            "SELECT id FROM fcm_tokens WHERE fcm_token = %s", (token,)
+        ).fetchone()
+        if existing:
+            db.execute(
+                "UPDATE fcm_tokens SET updated_at = NOW(), user_id = COALESCE(%s, user_id) WHERE fcm_token = %s",
+                (user_id, token),
+            )
+        else:
+            db.execute(
+                "INSERT INTO fcm_tokens (fcm_token, user_id, created_at, updated_at) VALUES (%s, %s, NOW(), NOW())",
+                (token, user_id),
+            )
+        db.commit()
 
 
 def _remove_token(token: str):
     try:
-        db = get_db()
-        db.execute("DELETE FROM fcm_tokens WHERE fcm_token = %s", (token,))
-        db.commit()
-        db.close()
+        with get_db() as db:
+            db.execute("DELETE FROM fcm_tokens WHERE fcm_token = %s", (token,))
+            db.commit()
         logger.info("Removed stale FCM token from database")
     except Exception as e:
         logger.error("Failed to remove stale FCM token: %s", e)

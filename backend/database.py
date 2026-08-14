@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import hashlib
+import threading
 from datetime import datetime
 import psycopg2
 from psycopg2 import pool
@@ -11,8 +12,49 @@ from config import DATABASE_URL, DB_POOL_MIN, DB_POOL_MAX, CONNECT_TIMEOUT
 logger = logging.getLogger(__name__)
 
 _pool = None
-_pool_lock = False
+_pool_lock = threading.Lock()
+_pool_generation = 0
 _db_initialized = False
+_db_init_lock = threading.Lock()
+
+_thread_connections = threading.local()
+
+
+def _track(db):
+    """Register an open DBConnection on the current thread."""
+    reg = getattr(_thread_connections, 'connections', None)
+    if reg is None:
+        reg = []
+        _thread_connections.connections = reg
+    reg.append(db)
+
+
+def _untrack(db):
+    """Remove a DBConnection from the current thread's registry."""
+    reg = getattr(_thread_connections, 'connections', None)
+    if reg is not None:
+        try:
+            reg.remove(db)
+        except ValueError:
+            pass
+
+
+def close_thread_connections():
+    """Close every DBConnection still open on the current thread.
+
+    This is the safety net that guarantees no connection can leak even if a
+    code path forgets to call ``db.close()``. Call it at the end of every
+    HTTP request (Flask ``teardown_request``) and after each sync-worker
+    iteration."""
+    reg = getattr(_thread_connections, 'connections', None)
+    if not reg:
+        return
+    for db in list(reg):
+        try:
+            db.close()
+        except Exception:
+            pass
+    reg.clear()
 
 DEFAULT_ADMIN_USERNAME = 'admin_medihive'
 DEFAULT_ADMIN_PASSWORD = '1234567890'
@@ -32,29 +74,38 @@ def _build_connection_kwargs():
 
 
 def get_pool():
-    global _pool, _pool_lock
-    if _pool is None and not _pool_lock:
-        _pool_lock = True
-        try:
-            _pool = pool.ThreadedConnectionPool(
-                minconn=0,
-                maxconn=DB_POOL_MAX,
-                **_build_connection_kwargs(),
-            )
-        except Exception as e:
-            logger.error("Failed to create connection pool: %s", e)
-            _pool_lock = False
-            raise
-        _pool_lock = False
+    """Return the process-wide connection pool, creating it lazily.
+
+    Creation is guarded by a real lock so concurrent threads (request
+    handlers + the background sync worker) can never create duplicate pools.
+    """
+    global _pool
+    with _pool_lock:
+        if _pool is None:
+            try:
+                _pool = pool.ThreadedConnectionPool(
+                    minconn=0,
+                    maxconn=DB_POOL_MAX,
+                    **_build_connection_kwargs(),
+                )
+            except Exception as e:
+                logger.error("Failed to create connection pool: %s", e)
+                raise
     return _pool
 
 
 def reset_pool():
-    """Close and reset the pool. Used after Neon auto-suspend recovery."""
-    global _pool, _pool_lock
-    old_pool = _pool
-    _pool = None
-    _pool_lock = False
+    """Close and reset the pool. Used after Neon auto-suspend recovery or
+    when the pool is exhausted (leaked connections).
+
+    Any DBConnection checked out from the old pool is discarded on close
+    instead of being returned to the new pool, so it can never leak into a
+    foreign pool."""
+    global _pool, _pool_generation
+    with _pool_lock:
+        old_pool = _pool
+        _pool = None
+        _pool_generation += 1
     if old_pool is not None:
         try:
             old_pool.closeall()
@@ -64,11 +115,33 @@ def reset_pool():
 
 class DBConnection:
     """Wrapper around psycopg2 connection + RealDictCursor
-    providing a simple execute/commit/rollback/close interface."""
+    providing a simple execute/commit/rollback/close interface.
 
-    def __init__(self, conn):
+    Usable as a context manager so the connection is ALWAYS returned to the
+    pool, even when the wrapped code raises an exception::
+
+        with get_db() as db:
+            db.execute(...)
+            db.commit()
+
+    ``close()`` is idempotent and pool-generation aware, so double closes
+    and stale connections left over from a pool reset are handled safely.
+    """
+
+    def __init__(self, conn, pool_obj, generation=0):
         self._conn = conn
+        self._pool_obj = pool_obj
+        self._generation = generation
+        self._closed = False
         self._cursor = conn.cursor(cursor_factory=RealDictCursor)
+        _track(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
     def execute(self, sql, params=None):
         try:
@@ -120,39 +193,71 @@ class DBConnection:
                 pass
 
     def close(self):
+        """Return the connection to the pool it was borrowed from.
+
+        If that pool has since been reset/replaced, the connection is closed
+        directly instead of being returned to a foreign pool (returning it to
+        a foreign pool would raise and permanently leak it)."""
+        if self._closed:
+            return
+        self._closed = True
+        _untrack(self)
         try:
             self._cursor.close()
         except Exception:
             pass
+        with _pool_lock:
+            current_pool = _pool
+        if current_pool is not self._pool_obj:
+            # The pool this connection came from was reset. Discard it.
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            return
         try:
-            get_pool().putconn(self._conn)
+            self._pool_obj.putconn(self._conn)
         except Exception:
-            pass
+            # putconn failed; discard rather than leak.
+            try:
+                self._conn.close()
+            except Exception:
+                pass
 
 
 def get_db():
     """Get a database connection from the pool.
+
     Lazily initializes the database schema on first call.
-    Retries once if the pool needs re-creation (e.g., after Neon auto-suspend)."""
+
+    Retries transparently when the pool is transiently exhausted (waits for
+    in-flight handlers to return connections). Only if it is still exhausted
+    after all attempts does it reset the pool to self-heal from leaked
+    connections (e.g. after Neon auto-suspend or the old leak bug)."""
     _init_db()
-    for attempt in range(2):
+    last_err = None
+    for attempt in range(3):
         try:
             pool_obj = get_pool()
             if pool_obj is None:
-                if attempt == 0:
-                    reset_pool()
-                    time.sleep(1)
-                    continue
                 raise RuntimeError("Connection pool not available")
             conn = pool_obj.getconn()
-            return DBConnection(conn)
-        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
-            logger.warning("get_db attempt %d failed: %s", attempt + 1, e)
-            if attempt == 0:
-                reset_pool()
+            return DBConnection(conn, pool_obj, _pool_generation)
+        except pool.PoolError as e:
+            last_err = e
+            if attempt < 2:
+                logger.warning("Connection pool exhausted (attempt %d); retrying...", attempt + 1)
                 time.sleep(1)
                 continue
-            raise
+            logger.warning("Connection pool still exhausted; resetting pool to self-heal: %s", e)
+            reset_pool()
+            time.sleep(1)
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            last_err = e
+            logger.warning("get_db attempt %d failed: %s", attempt + 1, e)
+            reset_pool()
+            time.sleep(1)
+    raise last_err if last_err is not None else RuntimeError("get_db failed")
 
 
 def _init_db():
@@ -164,11 +269,14 @@ def _init_db():
     if _db_initialized:
         return
 
-    logger.info("Database initialized successfully")
-    pool_obj = get_pool()
-    conn = pool_obj.getconn()
-    db = DBConnection(conn)
-    db.rollback()
+    with _db_init_lock:
+        if _db_initialized:
+            return
+
+        pool_obj = get_pool()
+        conn = pool_obj.getconn()
+        db = DBConnection(conn, pool_obj, _pool_generation)
+        db.rollback()
     try:
         # Rename legacy table if it exists
         db.try_execute("ALTER TABLE opd_records RENAME TO opd_visits")

@@ -8,11 +8,10 @@ appointments_bp = Blueprint('appointments', __name__)
 
 
 def _get_clinic_id(user_id):
-    db = get_db()
-    user = db.execute(
-        "SELECT clinic_id FROM users WHERE id = %s", (user_id,)
-    ).fetchone()
-    db.close()
+    with get_db() as db:
+        user = db.execute(
+            "SELECT clinic_id FROM users WHERE id = %s", (user_id,)
+        ).fetchone()
     return user['clinic_id'] if user and user['clinic_id'] else None
 
 

@@ -8,7 +8,7 @@ import threading
 import shutil
 from datetime import datetime
 
-from database import get_db
+from database import get_db, close_thread_connections
 from models.patient import Patient
 from models.opd_record import OPDRecord
 from models.appointment import Appointment
@@ -34,7 +34,6 @@ class LocalFileWrapper:
 
 def enqueue_sync_event(entity_type, entity_id, operation='upsert', clinic_id='', origin_device_id=None):
     """Enqueue an event to PostgreSQL sync_queue."""
-    db = get_db()
     now = datetime.utcnow().isoformat()
     last_attempt = f"origin_device_id:{origin_device_id}" if origin_device_id else None
     
@@ -45,13 +44,13 @@ def enqueue_sync_event(entity_type, entity_id, operation='upsert', clinic_id='',
         "drive_update": "pending"
     }
     
-    db.execute("""
-        INSERT INTO sync_queue 
-            (entity_type, entity_id, operation, status, retry_count, last_error, created_at, last_attempt, clinic_id)
-        VALUES (%s, %s, %s, 'pending', 0, %s, %s, %s, %s)
-    """, (entity_type, entity_id, operation, json.dumps(initial_state), now, last_attempt, clinic_id))
-    db.commit()
-    db.close()
+    with get_db() as db:
+        db.execute("""
+            INSERT INTO sync_queue 
+                (entity_type, entity_id, operation, status, retry_count, last_error, created_at, last_attempt, clinic_id)
+            VALUES (%s, %s, %s, 'pending', 0, %s, %s, %s, %s)
+        """, (entity_type, entity_id, operation, json.dumps(initial_state), now, last_attempt, clinic_id))
+        db.commit()
     logger.info("Enqueued sync event: entity_type=%s entity_id=%s operation=%s clinic_id=%s",
                 entity_type, entity_id, operation, clinic_id)
 
@@ -71,6 +70,11 @@ class SyncWorkerThread(threading.Thread):
                 self.process_next_event()
             except Exception as e:
                 logger.exception("Error in sync worker iteration: %s", e)
+            finally:
+                # Return any DB connections the iteration opened but did not
+                # close (e.g. exception paths). Prevents pool exhaustion in
+                # the long-running worker thread.
+                close_thread_connections()
             # Poll every 5 seconds
             self.stop_event.wait(5.0)
         logger.info("Sync background worker thread stopped.")

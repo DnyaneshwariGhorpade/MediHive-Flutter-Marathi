@@ -68,11 +68,10 @@ def _remote_newer_or_equal(remote_updated, local_updated):
 
 
 def _get_user_clinic_id(user_id):
-    db = get_db()
-    user = db.execute(
-        "SELECT clinic_id FROM users WHERE id = %s", (user_id,)
-    ).fetchone()
-    db.close()
+    with get_db() as db:
+        user = db.execute(
+            "SELECT clinic_id FROM users WHERE id = %s", (user_id,)
+        ).fetchone()
     return user['clinic_id'] if user and user['clinic_id'] else None
 
 
@@ -91,19 +90,18 @@ def _sync_opd_to_sheets(opd, image_links=None):
             patient_id, opd_id,
         )
         now = datetime.utcnow().isoformat()
-        db = get_db()
         clinic_id = opd.get('clinic_id', '')
-        db.execute("""
-            INSERT INTO patients
-                (id, full_name, mobile_number, gender, created_at, updated_at, clinic_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
-        """, (
-            patient_id, 'Unknown (Auto-created)',
-            '', 'Not Specified', now, now, clinic_id,
-        ))
-        db.commit()
-        db.close()
+        with get_db() as db:
+            db.execute("""
+                INSERT INTO patients
+                    (id, full_name, mobile_number, gender, created_at, updated_at, clinic_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+            """, (
+                patient_id, 'Unknown (Auto-created)',
+                '', 'Not Specified', now, now, clinic_id,
+            ))
+            db.commit()
         patient = Patient.get(patient_id)
         if not patient:
             logger.error(
@@ -177,8 +175,7 @@ def _upsert_clinic_settings(clinic_id, payload, now):
     Returns (row_dict_or_None, conflict_message_or_None).
     """
     remote_updated = _norm_utc(payload.get('updated_at')) or now
-    db = get_db()
-    try:
+    with get_db() as db:
         row = db.execute(
             "SELECT * FROM clinic_settings WHERE clinic_id = %s ORDER BY id ASC LIMIT 1",
             (clinic_id,),
@@ -211,9 +208,7 @@ def _upsert_clinic_settings(clinic_id, payload, now):
             "SELECT * FROM clinic_settings WHERE clinic_id = %s ORDER BY id ASC LIMIT 1",
             (clinic_id,),
         ).fetchone()
-        return (dict(result) if result else None), None
-    finally:
-        db.close()
+    return (dict(result) if result else None), None
 
 
 def _upsert_calendar_note(clinic_id, user_id, payload, now):
@@ -227,8 +222,7 @@ def _upsert_calendar_note(clinic_id, user_id, payload, now):
         return None, None
 
     note_text = payload.get('note_text', '[]')
-    db = get_db()
-    try:
+    with get_db() as db:
         if note_text is None or str(note_text) == '[]' or not str(note_text).strip():
             db.execute(
                 "DELETE FROM calendar_notes WHERE note_date = %s AND clinic_id = %s",
@@ -270,9 +264,7 @@ def _upsert_calendar_note(clinic_id, user_id, payload, now):
             "SELECT * FROM calendar_notes WHERE note_date = %s AND clinic_id = %s",
             (note_date, clinic_id),
         ).fetchone()
-        return (dict(result) if result else {'note_date': note_date, 'deleted': True}), None
-    finally:
-        db.close()
+    return (dict(result) if result else {'note_date': note_date, 'deleted': True}), None
 
 
 def _upsert_master_item(table, name):
@@ -280,51 +272,39 @@ def _upsert_master_item(table, name):
     name = (name or '').strip()
     if not name:
         return None
-    db = get_db()
-    try:
+    with get_db() as db:
         db.execute(
             f"INSERT INTO {table} (name) VALUES (%s) "
             f"ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name",
             (name,),
         )
         db.commit()
-        return {'name': name}
-    finally:
-        db.close()
+    return {'name': name}
 
 
 def _latest_clinic_settings(clinic_id):
-    db = get_db()
-    try:
+    with get_db() as db:
         row = db.execute(
             "SELECT * FROM clinic_settings WHERE clinic_id = %s ORDER BY id ASC LIMIT 1",
             (clinic_id,),
         ).fetchone()
-        return dict(row) if row else None
-    finally:
-        db.close()
+    return dict(row) if row else None
 
 
 def _calendar_notes_since(clinic_id, last_sync):
-    db = get_db()
-    try:
+    with get_db() as db:
         rows = db.execute(
             "SELECT * FROM calendar_notes WHERE clinic_id = %s "
             "AND COALESCE(NULLIF(updated_at, ''), created_at) > %s ORDER BY updated_at",
             (clinic_id, last_sync),
         ).fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        db.close()
+    return [dict(r) for r in rows]
 
 
 def _all_master_items(table):
-    db = get_db()
-    try:
+    with get_db() as db:
         rows = db.execute(f"SELECT name FROM {table} ORDER BY name").fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        db.close()
+    return [dict(r) for r in rows]
 
 
 # ── Device Registration ─────────────────────────────
@@ -564,24 +544,23 @@ def sync_upload():
 
     # ── Write sync log to cloud_sync_log ──
     try:
-        db = get_db()
-        status_val = 'conflict' if conflicts else 'success'
-        err_msg = "; ".join(conflicts) if conflicts else ''
-        db.execute("""
-            INSERT INTO cloud_sync_log 
-                (clinic_id, device_id, direction, patients_count, opd_count, 
-                 appointments_count, deleted_count, status, error_message, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            clinic_id, device_id, 'upload',
-            len(data.get('patients', [])),
-            len(data.get('opd_records', [])),
-            len(data.get('appointments', [])),
-            len(data.get('deleted_entities', [])),
-            status_val, err_msg, now
-        ))
-        db.commit()
-        db.close()
+        with get_db() as db:
+            status_val = 'conflict' if conflicts else 'success'
+            err_msg = "; ".join(conflicts) if conflicts else ''
+            db.execute("""
+                INSERT INTO cloud_sync_log 
+                    (clinic_id, device_id, direction, patients_count, opd_count, 
+                     appointments_count, deleted_count, status, error_message, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                clinic_id, device_id, 'upload',
+                len(data.get('patients', [])),
+                len(data.get('opd_records', [])),
+                len(data.get('appointments', [])),
+                len(data.get('deleted_entities', [])),
+                status_val, err_msg, now
+            ))
+            db.commit()
     except Exception as e:
         logger.error("Failed to write cloud_sync_log: %s", e)
 
@@ -676,13 +655,12 @@ def full_restore():
     formatted_patients = [_format_patient(p) for p in patients]
     formatted_opd = [_format_opd(o) for o in opd_records]
 
-    db = get_db()
-    deleted_entities_rows = db.execute(
-        "SELECT entity_type, entity_id, deleted_at FROM deleted_entities "
-        "WHERE clinic_id = %s ORDER BY deleted_at",
-        (clinic_id,)
-    ).fetchall()
-    db.close()
+    with get_db() as db:
+        deleted_entities_rows = db.execute(
+            "SELECT entity_type, entity_id, deleted_at FROM deleted_entities "
+            "WHERE clinic_id = %s ORDER BY deleted_at",
+            (clinic_id,)
+        ).fetchall()
     deleted_entities = [dict(r) for r in deleted_entities_rows]
 
     clinic = Clinic.get(clinic_id)
@@ -772,11 +750,10 @@ def sync_upload_images(opd_id):
 @jwt_required()
 def clinic_info():
     user_id = get_jwt_identity()
-    db = get_db()
-    user = db.execute(
-        "SELECT clinic_id FROM users WHERE id = %s", (user_id,)
-    ).fetchone()
-    db.close()
+    with get_db() as db:
+        user = db.execute(
+            "SELECT clinic_id FROM users WHERE id = %s", (user_id,)
+        ).fetchone()
 
     if user and user['clinic_id']:
         clinic = Clinic.get(user['clinic_id'])

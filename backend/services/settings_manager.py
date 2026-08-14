@@ -54,17 +54,15 @@ class SettingsManager:
         Called automatically at application startup.  Safe to call
         multiple times — re-reads from DB on every call.
         """
-        db = get_db()
         try:
-            rows = db.execute(
-                "SELECT key, value FROM settings"
-            ).fetchall()
+            with get_db() as db:
+                rows = db.execute(
+                    "SELECT key, value FROM settings"
+                ).fetchall()
             rows_list = [dict(r) for r in rows]
         except Exception:
-            logger.warning("Could not read settings from DB — using defaults")
+            logger.warning("Could not read settings from DB � using defaults")
             rows_list = []
-        finally:
-            db.close()
 
         if rows_list:
             self._settings = SettingsModel.from_db_rows(rows_list)
@@ -139,24 +137,22 @@ class SettingsManager:
     def _persist(self, settings: SettingsModel) -> None:
         """Write all settings rows to the database (upsert)."""
         rows = settings.to_db_rows()
-        db = get_db()
         try:
-            for row in rows:
-                db.execute(
-                    """
-                    INSERT INTO settings (key, value)
-                    VALUES (%s, %s)
-                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-                    """,
-                    (row["key"], row["value"]),
-                )
-            db.commit()
+            with get_db() as db:
+                for row in rows:
+                    db.execute(
+                        """
+                        INSERT INTO settings (key, value)
+                        VALUES (%s, %s)
+                        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                        """,
+                        (row["key"], row["value"]),
+                    )
+                db.commit()
         except Exception:
             db.rollback()
             logger.exception("Failed to persist settings")
             raise
-        finally:
-            db.close()
 
     def _notify(self, settings: SettingsModel) -> None:
         for listener in self._listeners:

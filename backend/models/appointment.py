@@ -13,61 +13,58 @@ class Appointment:
 
     @staticmethod
     def all(date=None, clinic_id=None):
-        db = get_db()
-        if date and clinic_id:
-            rows = db.execute(
-                "SELECT * FROM appointments WHERE CAST(date_time AS DATE) = %s AND clinic_id = %s ORDER BY date_time",
-                (date, clinic_id)
-            ).fetchall()
-        elif date:
-            rows = db.execute(
-                "SELECT * FROM appointments WHERE CAST(date_time AS DATE) = %s ORDER BY date_time",
-                (date,)
-            ).fetchall()
-        elif clinic_id:
-            rows = db.execute(
-                "SELECT * FROM appointments WHERE clinic_id = %s ORDER BY date_time DESC",
-                (clinic_id,)
-            ).fetchall()
-        else:
-            rows = db.execute("SELECT * FROM appointments ORDER BY date_time DESC").fetchall()
-        db.close()
+        with get_db() as db:
+            if date and clinic_id:
+                rows = db.execute(
+                    "SELECT * FROM appointments WHERE CAST(date_time AS DATE) = %s AND clinic_id = %s ORDER BY date_time",
+                    (date, clinic_id)
+                ).fetchall()
+            elif date:
+                rows = db.execute(
+                    "SELECT * FROM appointments WHERE CAST(date_time AS DATE) = %s ORDER BY date_time",
+                    (date,)
+                ).fetchall()
+            elif clinic_id:
+                rows = db.execute(
+                    "SELECT * FROM appointments WHERE clinic_id = %s ORDER BY date_time DESC",
+                    (clinic_id,)
+                ).fetchall()
+            else:
+                rows = db.execute("SELECT * FROM appointments ORDER BY date_time DESC").fetchall()
         return [Appointment.dict_from_row(r) for r in rows]
 
     @staticmethod
     def get(appt_id, clinic_id=None):
-        db = get_db()
-        if clinic_id:
-            row = db.execute(
-                "SELECT * FROM appointments WHERE id = %s AND clinic_id = %s",
-                (appt_id, clinic_id)
-            ).fetchone()
-        else:
-            row = db.execute("SELECT * FROM appointments WHERE id = %s", (appt_id,)).fetchone()
-        db.close()
+        with get_db() as db:
+            if clinic_id:
+                row = db.execute(
+                    "SELECT * FROM appointments WHERE id = %s AND clinic_id = %s",
+                    (appt_id, clinic_id)
+                ).fetchone()
+            else:
+                row = db.execute("SELECT * FROM appointments WHERE id = %s", (appt_id,)).fetchone()
         return Appointment.dict_from_row(row)
 
     @staticmethod
     def create(data):
         now = datetime.utcnow().isoformat()
-        db = get_db()
-        db.execute("""
-            INSERT INTO appointments (id, patient_id, patient_name, date_time, notes,
-                                      created_at, updated_at, user_id, clinic_id,
-                                      device_id, sync_status, last_synced_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            data['id'], data.get('patient_id', ''),
-            data.get('patient_name', ''), data['date_time'],
-            data.get('notes', ''), now, now,
-            data.get('user_id', ''),
-            data.get('clinic_id', ''),
-            data.get('device_id', ''),
-            data.get('sync_status', 'pending'),
-            data.get('last_synced_at', ''),
-        ))
-        db.commit()
-        db.close()
+        with get_db() as db:
+            db.execute("""
+                INSERT INTO appointments (id, patient_id, patient_name, date_time, notes,
+                                          created_at, updated_at, user_id, clinic_id,
+                                          device_id, sync_status, last_synced_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                data['id'], data.get('patient_id', ''),
+                data.get('patient_name', ''), data['date_time'],
+                data.get('notes', ''), now, now,
+                data.get('user_id', ''),
+                data.get('clinic_id', ''),
+                data.get('device_id', ''),
+                data.get('sync_status', 'pending'),
+                data.get('last_synced_at', ''),
+            ))
+            db.commit()
         return Appointment.get(data['id'])
 
     @staticmethod
@@ -86,34 +83,31 @@ class Appointment:
         fields.append("updated_at = %s")
         values.append(now)
         values.append(appt_id)
-        if clinic_id:
-            values.append(clinic_id)
-            db = get_db()
-            db.execute(
-                f"UPDATE appointments SET {', '.join(fields)} WHERE id = %s AND clinic_id = %s",
-                values
-            )
-        else:
-            db = get_db()
-            db.execute(f"UPDATE appointments SET {', '.join(fields)} WHERE id = %s", values)
-        db.commit()
-        db.close()
+        with get_db() as db:
+            if clinic_id:
+                values.append(clinic_id)
+                db.execute(
+                    f"UPDATE appointments SET {', '.join(fields)} WHERE id = %s AND clinic_id = %s",
+                    values
+                )
+            else:
+                db.execute(f"UPDATE appointments SET {', '.join(fields)} WHERE id = %s", values)
+            db.commit()
         return Appointment.get(appt_id, clinic_id=clinic_id)
 
     @staticmethod
     def delete(appt_id, clinic_id=None):
         from models.deleted_entity import DeletedEntity
         DeletedEntity.record('appointment', appt_id, clinic_id=clinic_id or '')
-        db = get_db()
-        if clinic_id:
-            db.execute(
-                "DELETE FROM appointments WHERE id = %s AND clinic_id = %s",
-                (appt_id, clinic_id)
-            )
-        else:
-            db.execute("DELETE FROM appointments WHERE id = %s", (appt_id,))
-        db.commit()
-        db.close()
+        with get_db() as db:
+            if clinic_id:
+                db.execute(
+                    "DELETE FROM appointments WHERE id = %s AND clinic_id = %s",
+                    (appt_id, clinic_id)
+                )
+            else:
+                db.execute("DELETE FROM appointments WHERE id = %s", (appt_id,))
+            db.commit()
 
     @staticmethod
     def upsert(data, clinic_id=None):
@@ -124,47 +118,43 @@ class Appointment:
 
     @staticmethod
     def by_clinic(clinic_id):
-        db = get_db()
-        rows = db.execute(
-            "SELECT * FROM appointments WHERE clinic_id = %s ORDER BY updated_at DESC",
-            (clinic_id,)
-        ).fetchall()
-        db.close()
+        with get_db() as db:
+            rows = db.execute(
+                "SELECT * FROM appointments WHERE clinic_id = %s ORDER BY updated_at DESC",
+                (clinic_id,)
+            ).fetchall()
         return [Appointment.dict_from_row(r) for r in rows]
 
     @staticmethod
     def updated_since(timestamp, clinic_id=None):
-        db = get_db()
-        if clinic_id:
-            rows = db.execute(
-                "SELECT * FROM appointments WHERE updated_at > %s AND clinic_id = %s ORDER BY updated_at",
-                (timestamp, clinic_id)
-            ).fetchall()
-        else:
-            rows = db.execute(
-                "SELECT * FROM appointments WHERE updated_at > %s ORDER BY updated_at",
-                (timestamp,)
-            ).fetchall()
-        db.close()
+        with get_db() as db:
+            if clinic_id:
+                rows = db.execute(
+                    "SELECT * FROM appointments WHERE updated_at > %s AND clinic_id = %s ORDER BY updated_at",
+                    (timestamp, clinic_id)
+                ).fetchall()
+            else:
+                rows = db.execute(
+                    "SELECT * FROM appointments WHERE updated_at > %s ORDER BY updated_at",
+                    (timestamp,)
+                ).fetchall()
         return [Appointment.dict_from_row(r) for r in rows]
 
     @staticmethod
     def full_restore(clinic_id):
-        db = get_db()
-        rows = db.execute(
-            "SELECT * FROM appointments WHERE clinic_id = %s ORDER BY updated_at",
-            (clinic_id,)
-        ).fetchall()
-        db.close()
+        with get_db() as db:
+            rows = db.execute(
+                "SELECT * FROM appointments WHERE clinic_id = %s ORDER BY updated_at",
+                (clinic_id,)
+            ).fetchall()
         return [Appointment.dict_from_row(r) for r in rows]
 
     @staticmethod
     def mark_synced(appt_id, clinic_id, synced_at):
-        db = get_db()
-        db.execute(
-            "UPDATE appointments SET sync_status = 'synced', last_synced_at = %s, updated_at = %s "
-            "WHERE id = %s AND clinic_id = %s",
-            (synced_at, synced_at, appt_id, clinic_id)
-        )
-        db.commit()
-        db.close()
+        with get_db() as db:
+            db.execute(
+                "UPDATE appointments SET sync_status = 'synced', last_synced_at = %s, updated_at = %s "
+                "WHERE id = %s AND clinic_id = %s",
+                (synced_at, synced_at, appt_id, clinic_id)
+            )
+            db.commit()

@@ -20,13 +20,12 @@ def login():
     if not username or not password:
         return jsonify({'error': 'Username and password required'}), 400
 
-    db = get_db()
     hashed = hashlib.sha256(password.encode()).hexdigest()
-    user = db.execute(
-        "SELECT * FROM users WHERE username = %s AND password = %s",
-        (username, hashed)
-    ).fetchone()
-    db.close()
+    with get_db() as db:
+        user = db.execute(
+            "SELECT * FROM users WHERE username = %s AND password = %s",
+            (username, hashed)
+        ).fetchone()
 
     if user is None:
         return jsonify({'error': 'Invalid credentials'}), 401
@@ -57,33 +56,31 @@ def register():
     if not username or not password:
         return jsonify({'error': 'Username and password required'}), 400
 
-    db = get_db()
-    existing = db.execute("SELECT id FROM users WHERE username = %s", (username,)).fetchone()
-    if existing:
-        db.close()
-        return jsonify({'error': 'Username already exists'}), 409
+    with get_db() as db:
+        existing = db.execute("SELECT id FROM users WHERE username = %s", (username,)).fetchone()
+        if existing:
+            return jsonify({'error': 'Username already exists'}), 409
 
-    clinic_id = f'CLI{uuid.uuid4().hex[:8].upper()}'
-    now = datetime.utcnow().isoformat()
+        clinic_id = f'CLI{uuid.uuid4().hex[:8].upper()}'
+        now = datetime.utcnow().isoformat()
 
-    db.execute("""
-        INSERT INTO clinics (id, name, email, phone, address, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (id) DO NOTHING
-    """, (clinic_id, f"{name}'s Clinic", '', '', '', now, now))
+        db.execute("""
+            INSERT INTO clinics (id, name, email, phone, address, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+        """, (clinic_id, f"{name}'s Clinic", '', '', '', now, now))
 
-    hashed = hashlib.sha256(password.encode()).hexdigest()
-    row = db.execute(
-        "INSERT INTO users (username, password, name, created_at, clinic_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-        (username, hashed, name, now, clinic_id)
-    ).fetchone()
-    db.commit()
-    user_id = row['id']
+        hashed = hashlib.sha256(password.encode()).hexdigest()
+        row = db.execute(
+            "INSERT INTO users (username, password, name, created_at, clinic_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (username, hashed, name, now, clinic_id)
+        ).fetchone()
+        db.commit()
+        user_id = row['id']
+
+        clinic = db.execute("SELECT * FROM clinics WHERE id = %s", (clinic_id,)).fetchone()
 
     token = create_access_token(identity=str(user_id))
-
-    clinic = db.execute("SELECT * FROM clinics WHERE id = %s", (clinic_id,)).fetchone()
-    db.close()
 
     return jsonify({
         'token': token,
@@ -115,33 +112,31 @@ def register_clinic():
     if not username or not password or not clinic_name:
         return jsonify({'error': 'Username, password, and clinic_name required'}), 400
 
-    db = get_db()
-    existing = db.execute("SELECT id FROM users WHERE username = %s", (username,)).fetchone()
-    if existing:
-        db.close()
-        return jsonify({'error': 'Username already exists'}), 409
+    with get_db() as db:
+        existing = db.execute("SELECT id FROM users WHERE username = %s", (username,)).fetchone()
+        if existing:
+            return jsonify({'error': 'Username already exists'}), 409
 
-    clinic_id = data.get('clinic_id', '').strip() or f'CLI{uuid.uuid4().hex[:8].upper()}'
-    now = datetime.utcnow().isoformat()
+        clinic_id = data.get('clinic_id', '').strip() or f'CLI{uuid.uuid4().hex[:8].upper()}'
+        now = datetime.utcnow().isoformat()
 
-    db.execute("""
-        INSERT INTO clinics (id, name, email, phone, address, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (id) DO NOTHING
-    """, (clinic_id, clinic_name, clinic_email, clinic_phone, clinic_address, now, now))
+        db.execute("""
+            INSERT INTO clinics (id, name, email, phone, address, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+        """, (clinic_id, clinic_name, clinic_email, clinic_phone, clinic_address, now, now))
 
-    hashed = hashlib.sha256(password.encode()).hexdigest()
-    row = db.execute(
-        "INSERT INTO users (username, password, name, created_at, clinic_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-        (username, hashed, name, now, clinic_id)
-    ).fetchone()
-    db.commit()
-    user_id = row['id']
+        hashed = hashlib.sha256(password.encode()).hexdigest()
+        row = db.execute(
+            "INSERT INTO users (username, password, name, created_at, clinic_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (username, hashed, name, now, clinic_id)
+        ).fetchone()
+        db.commit()
+        user_id = row['id']
+
+        clinic = db.execute("SELECT * FROM clinics WHERE id = %s", (clinic_id,)).fetchone()
 
     token = create_access_token(identity=str(user_id))
-
-    clinic = db.execute("SELECT * FROM clinics WHERE id = %s", (clinic_id,)).fetchone()
-    db.close()
 
     return jsonify({
         'token': token,
@@ -160,12 +155,11 @@ def register_clinic():
 @jwt_required()
 def me():
     user_id = get_jwt_identity()
-    db = get_db()
-    user = db.execute(
-        "SELECT id, username, name, created_at, clinic_id, role FROM users WHERE id = %s",
-        (user_id,)
-    ).fetchone()
-    db.close()
+    with get_db() as db:
+        user = db.execute(
+            "SELECT id, username, name, created_at, clinic_id, role FROM users WHERE id = %s",
+            (user_id,)
+        ).fetchone()
     if user is None:
         return jsonify({'error': 'User not found'}), 404
     return jsonify({'user': dict(user)}), 200

@@ -4,6 +4,7 @@ from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from config import SECRET_KEY, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
 from services.log_service import get_logger
+from database import close_thread_connections
 
 from routes.auth import auth_bp
 from routes.patients import patients_bp
@@ -72,6 +73,13 @@ def _init_settings_on_first_request():
         start_worker()
         
         _initialised = True
+
+
+@app.teardown_request
+def _close_db_connections(exception=None):
+    """Return any DB connections still held by this request's thread to the
+    pool. Guards against leaks on error paths that skip db.close()."""
+    close_thread_connections()
 
 
 if __name__ == '__main__':

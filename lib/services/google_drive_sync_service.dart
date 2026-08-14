@@ -75,15 +75,18 @@ class DriveBackupInfo {
 
 class AuthenticatedClient extends http.BaseClient {
   final http.Client _client = http.Client();
-  final Map<String, String> _headers;
+  final Future<Map<String, String>> Function() _headersProvider;
 
-  AuthenticatedClient(this._headers);
+  AuthenticatedClient(this._headersProvider);
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
-    request.headers.addAll(_headers);
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    request.headers.addAll(await _headersProvider());
     return _client.send(request);
   }
+
+  @override
+  void close() => _client.close();
 }
 
 // ─── Main Service ──────────────────────────────────────────────
@@ -103,11 +106,12 @@ class GoogleDriveSyncService {
   int _retryCount = 0;
   static const int _maxRetries = 3;
 
-  /// Gets authenticated drive API instance
+  AuthenticatedClient? _driveClient;
+
+  /// Gets authenticated drive API instance (reuses one HTTP client to avoid leaks)
   Future<drive.DriveApi> _getDriveApi() async {
-    final headers = await _googleAuthService.getAuthHeaders();
-    final client = AuthenticatedClient(headers);
-    return drive.DriveApi(client);
+    _driveClient ??= AuthenticatedClient(_googleAuthService.getAuthHeaders);
+    return drive.DriveApi(_driveClient!);
   }
 
   /// Attempts to refresh auth and retry
