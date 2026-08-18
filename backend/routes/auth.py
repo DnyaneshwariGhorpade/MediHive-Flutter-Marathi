@@ -23,8 +23,8 @@ def login():
     hashed = hashlib.sha256(password.encode()).hexdigest()
     with get_db() as db:
         user = db.execute(
-            "SELECT * FROM users WHERE username = %s AND password = %s",
-            (username, hashed)
+            "SELECT * FROM users WHERE (username = %s OR LOWER(email) = LOWER(%s)) AND password = %s",
+            (username, username, hashed)
         ).fetchone()
 
     if user is None:
@@ -36,6 +36,7 @@ def login():
         'user': {
             'id': str(user['id']),
             'username': user['username'],
+            'email': user.get('email') or '',
             'name': user['name'],
             'clinic_id': user['clinic_id'] or '',
             'role': user.get('role', 'doctor'),
@@ -52,6 +53,7 @@ def register():
     username = data.get('username', '').strip()
     password = data.get('password', '')
     name = data.get('name', 'Doctor')
+    email = data.get('email', '').strip() or None
 
     if not username or not password:
         return jsonify({'error': 'Username and password required'}), 400
@@ -60,6 +62,11 @@ def register():
         existing = db.execute("SELECT id FROM users WHERE username = %s", (username,)).fetchone()
         if existing:
             return jsonify({'error': 'Username already exists'}), 409
+
+        if email:
+            email_taken = db.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s)", (email,)).fetchone()
+            if email_taken:
+                return jsonify({'error': 'Email already exists'}), 409
 
         clinic_id = f'CLI{uuid.uuid4().hex[:8].upper()}'
         now = datetime.utcnow().isoformat()
@@ -72,8 +79,8 @@ def register():
 
         hashed = hashlib.sha256(password.encode()).hexdigest()
         row = db.execute(
-            "INSERT INTO users (username, password, name, created_at, clinic_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (username, hashed, name, now, clinic_id)
+            "INSERT INTO users (username, password, name, email, created_at, clinic_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+            (username, hashed, name, email, now, clinic_id)
         ).fetchone()
         db.commit()
         user_id = row['id']
@@ -87,6 +94,7 @@ def register():
         'user': {
             'id': str(user_id),
             'username': username,
+            'email': email or '',
             'name': name,
             'clinic_id': clinic_id,
             'role': 'doctor',
@@ -104,6 +112,7 @@ def register_clinic():
     username = data.get('username', '').strip()
     password = data.get('password', '')
     name = data.get('name', 'Doctor')
+    email = data.get('email', '').strip() or None
     clinic_name = data.get('clinic_name', '').strip()
     clinic_email = data.get('clinic_email', '').strip()
     clinic_phone = data.get('clinic_phone', '').strip()
@@ -117,6 +126,11 @@ def register_clinic():
         if existing:
             return jsonify({'error': 'Username already exists'}), 409
 
+        if email:
+            email_taken = db.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s)", (email,)).fetchone()
+            if email_taken:
+                return jsonify({'error': 'Email already exists'}), 409
+
         clinic_id = data.get('clinic_id', '').strip() or f'CLI{uuid.uuid4().hex[:8].upper()}'
         now = datetime.utcnow().isoformat()
 
@@ -128,8 +142,8 @@ def register_clinic():
 
         hashed = hashlib.sha256(password.encode()).hexdigest()
         row = db.execute(
-            "INSERT INTO users (username, password, name, created_at, clinic_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (username, hashed, name, now, clinic_id)
+            "INSERT INTO users (username, password, name, email, created_at, clinic_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+            (username, hashed, name, email, now, clinic_id)
         ).fetchone()
         db.commit()
         user_id = row['id']
@@ -143,6 +157,7 @@ def register_clinic():
         'user': {
             'id': str(user_id),
             'username': username,
+            'email': email or '',
             'name': name,
             'clinic_id': clinic_id,
             'role': 'doctor',
@@ -157,7 +172,7 @@ def me():
     user_id = get_jwt_identity()
     with get_db() as db:
         user = db.execute(
-            "SELECT id, username, name, created_at, clinic_id, role FROM users WHERE id = %s",
+            "SELECT id, username, email, name, created_at, clinic_id, role FROM users WHERE id = %s",
             (user_id,)
         ).fetchone()
     if user is None:

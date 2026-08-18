@@ -15,13 +15,11 @@
   "logIn": "लॉग इन",
   "signInWithGoogle": "गूगलसह साइन इन करा",
   "googleSignInFailed": "Google Sign-In अयशस्वी",
-
   "home": "मुख्यपृष्ठ",
   "opd": "OPD",
   "patients": "रुग्ण",
   "calendar": "दिनदर्शिका",
   "settings": "सेटिंग्ज",
-
   "settingsTitle": "सेटिंग्ज",
   "account": "खाते",
   "doctorProfile": "डॉक्टर प्रोफाइल",
@@ -41,12 +39,10 @@
   "cancel": "रद्द करा",
   "saveChanges": "बदल जतन करा",
   "healthcareManagementSystem": "आरोग्य सेवा व्यवस्थापन प्रणाली",
-
   "language": "भाषा",
   "english": "इंग्रजी",
   "marathi": "मराठी",
   "selectLanguage": "भाषा निवडा",
-
   "goodMorning": "सुप्रभात",
   "goodAfternoon": "शुभ दुपार",
   "goodEvening": "शुभ संध्याकाळ",
@@ -67,11 +63,9 @@
   "weekly": "साप्ताहिक",
   "monthly": "मासिक",
   "yearly": "वार्षिक",
-
   "weeklyLabel": "साप्ताहिक",
   "monthlyLabel": "मासिक",
   "yearlyLabel": "वार्षिक",
-
   "opdQueue": "OPD रांगा",
   "today": "आज",
   "selectedDate": "निवडलेली तारीख",
@@ -89,7 +83,6 @@
   "years": "वर्षे",
   "notSpecified": "नमूद केलेले नाही",
   "newOpd": "नवीन OPD",
-
   "opdRegistration": "OPD नोंद",
   "patientInformation": "रुग्ण माहिती",
   "medicalClinicalDetails": "वैद्यकीय आणि क्लिनिकल तपशील",
@@ -157,12 +150,10 @@
   "recordSaved": "नोंद जतन केली!",
   "patientAddedSuccessfully": "रुग्ण यशस्वीरित्या जोडला",
   "failedToSaveRecord": "नोंद जतन करण्यात अयशस्वी. कृपया पुन्हा प्रयत्न करा.",
-
   "patientManagement": "रुग्ण व्यवस्थापन",
   "noPatientsYet": "अजून रुग्ण नाहीत",
   "noPatientsOnDate": "या तारखीला रुग्ण नाहीत",
   "addPatientViaOpd": "OPD नोंदद्वारे तुमचा पहिला रुग्ण जोडा",
-
   "patientDetails": "रुग्ण तपशील",
   "patientNotFound": "रुग्ण सापडला नाही",
   "contactInformation": "संपर्क माहिती",
@@ -177,7 +168,6 @@
   "delete": "हटवा",
   "whatsappOpened": "WhatsApp औषधपत्रासह उघडले",
   "noValidPhone": "रुग्णाकडे वैध फोन नंबर नाही",
-
   "editPatient": "रुग्ण संपादित करा",
   "patientInformationLabel": "रुग्ण माहिती",
   "nameRequired": "नाव आवश्यक आहे",
@@ -185,7 +175,6 @@
   "enterAtLeast10": "किमान १० अंक प्रविष्ट करा",
   "patientUpdated": "रुग्ण {name} अद्ययावत केला",
   "errorSaving": "जतन करण्यात त्रुटी: {error}",
-
   "prescription": "औषधपत्र",
   "medicinesPrescribed": "नियुक्त केलेली औषधे",
   "medicineName": "औषधाचे नाव",
@@ -198,7 +187,6 @@
   "tapEditIcon": "बदल करण्यासाठी संपादन आयकन टॅप करा",
   "prescriptionSaved": "औषधपत्र जतन केले",
   "failedToSavePrescription": "औषधपत्र जतन करण्यात अयशस्वी: {error}",
-
   "notificationsTitle": "सूचना",
   "markAllAsRead": "सर्व वाचलेले चिन्हांकित करा",
   "clearAll": "सर्व साफ करा",
@@ -207,7 +195,6 @@
   "hoursAgo": "{hours} तास पूर्वी",
   "yesterday": "काल",
   "noNotifications": "अजून सूचना नाहीत",
-
   "helpAndSupport": "मदत आणि सहाय्य",
   "developerInformation": "विकासकर्ता माहिती",
   "forTechnicalQueries": "तांत्रिक प्रश्नांसाठी:",
@@ -218,39 +205,31 @@
   "lastUpdated": "शेवटचे अद्ययावत:",
   "backupInformation": "बॅकअप माहिती",
   "backupFilesStored": "बॅकअप फाइल्स तुमच्या सिस्टमवर स्थानिकरित्या जतन केल्या जातात.",
-
   "backupAndRestore": "बॅकअप आणि पुनर्संचयन",
   "autoSync": "स्वयं सिंक",
   "syncFrequency": "सिंक वारंवारता",
   "wifiOnly": "फक्त WiFi",
   "driveUsage": "ड्राइव्ह वापर",
   "restore": "पुनर्संचयन",
-
   "authenticationTitle": "प्रमाणीकरण",
   "changePassword": "पासवर्ड बदला",
   "currentPassword": "सध्याचा पासवर्ड",
   "newPassword": "नवीन पासवर्ड",
   "confirmPassword": "पासवर्ड पुष्टी करा",
-
   "importFromDesktopTitle": "डेस्कटॉपवरून आयात",
   "selectFile": "फाइल निवडा",
   "importData": "डेटा आयात करा",
-
   "chatbotTitle": "MediHive सहाय्यक",
   "chatPlaceholder": "संदेश टाइप करा...",
-
   "forgotPasswordTitle": "पासवर्ड विसरलात",
   "verifyUsername": "वापरकर्ता नाव पडताळा",
   "resetPassword": "पासवर्ड रीसेट करा",
-
   "twoFactorVerifyTitle": "द्वि-घटक पडताळणी",
   "enterVerificationCode": "तुमचा पडताळणी कोड प्रविष्ट करा",
   "verify": "पडताळा",
   "useBackupCode": "बॅकअप कोड वापरा",
   "backupCodesRemaining": "तुमच्याकडे {count} बॅकअप कोड शिल्लक आहेत",
-
   "smartClinicManagement": "स्मार्ट क्लिनिक व्यवस्थापन",
-
   "googleDriveSync": "Google Drive सिंक",
   "cloudBackupActive": "क्लाउड बॅकअप सक्रिय",
   "keepDataSecure": "तुमच्या क्लिनिकचा डेटा सुरक्षित ठेवा",
@@ -265,7 +244,6 @@
   "syncingData": "डेटा सिंक होत आहे...",
   "connectingToGoogleDrive": "Google Drive शी जोडत आहे...",
   "googleDriveDisconnected": "Google Drive डिस्कनेक्ट केले.",
-
   "noPrescriptionRecords": "औषधपत्र नोंदी सापडल्या नाहीत",
   "failedToLoadPrescription": "औषधपत्र लोड करण्यात अयशस्वी: {error}",
   "errorSavingPrescription": "औषधपत्र जतन करण्यात त्रुटी: {error}",
@@ -273,7 +251,6 @@
   "printLabel": "प्रिंट",
   "noNewNotifications": "नवीन सूचना नाहीत",
   "allCaughtUp": "सर्व काम झाले!",
-
   "usernameNotFound": "वापरकर्ता नाव सापडले नाही",
   "passwordsDoNotMatch": "पासवर्ड जुळत नाहीत",
   "passwordTooShort": "पासवर्ड किमान ४ अक्षरांचा असणे आवश्यक",
@@ -286,11 +263,9 @@
   "confirmYourPassword": "तुमचा पासवर्ड पुष्टी करा",
   "enterYourUsername": "तुमचे वापरकर्ता नाव प्रविष्ट करा",
   "backToLogin": "लॉग इनवर परत",
-
   "invalidBackupCode": "अवैध बॅकअप कोड",
   "enterBackupCode": "बॅकअप कोड प्रविष्ट करा",
   "enterValidBackupCode": "वैध बॅकअप कोड प्रविष्ट करा (उदा. ABCD-1234)",
-
   "todaysFollowUps": "आजचे फॉलो-अप",
   "upcomingFollowUps": "आगामी फॉलो-अप",
   "noFollowUpsToday": "आज फॉलो-अप नाहीत.",
@@ -298,12 +273,10 @@
   "nScheduled": "{count} नियोजित",
   "noteAdded": "टिपणी जोडली",
   "addClinicalReminders": "क्लिनिकल आठवणे, डॉक्टर वेळापत्रक टिपणे...",
-
   "location": "स्थान:",
   "dataAndPrivacy": "डेटा आणि गोपनीयता",
   "dataPrivacyDescription": "सर्व रुग्ण डेटा तुमच्या सिस्टमवर स्थानिकरित्या जतन केला जातो. MediHive बाह्य सर्व्हर्सशी कोणताही डेटा अपलोड किंवा शेअर करत नाही. तुमचा डेटा पूर्णपणे खाजगी आणि सुरक्षित राहतो.",
   "frequentlyAskedQuestions": "वारंवार विचारले जाणारे प्रश्न",
-
   "backupAndCloudSyncTitle": "बॅकअप आणि क्लाउड सिंक",
   "localBackup": "स्थानिक बॅकअप",
   "exportAndShareLocally": "रुग्ण डेटा स्थानिकरित्या एक्स्पोर्ट आणि शेअर करा",
@@ -363,7 +336,6 @@
   "failedToConnect": "जोडण्यात अयशस्वी: {error}",
   "failedToDisconnect": "डिस्कनेक्ट करण्यात अयशस्वी: {error}",
   "backupScheduledAt": "आपोआप बॅकअप {time} वेळी नियोजित",
-
   "updatePassword": "पासवर्ड अद्ययावत करा",
   "updateLoginCredentials": "तुमची लॉगिन माहिती अद्ययावत करा",
   "enterLabel": "{label} प्रविष्ट करा",
@@ -396,7 +368,6 @@
   "currentDevice": "सध्याचे डिव्हाइस",
   "sessionActive": "सत्र सक्रिय",
   "activeLabel": "सक्रिय",
-
   "aiAssistant": "AI सहाय्यक",
   "alwaysHereToHelp": "नेहमी मदतीसाठी येथे",
   "helloAssistant": "नमस्कार, मी तुमचा MediHive AI सहाय्यक आहे",
@@ -407,7 +378,6 @@
   "openCalendar": "दिनदर्शिका उघडा →",
   "viewPatientList": "रुग्ण यादी पहा →",
   "demoAssistantMessage": "मी पूर्वनिर्धारित उत्तरांसह एक डेमो सहाय्यक आहे. वरील शिफारस केलेल्या प्रॉम्प्ट्सपैकी एक वापरा, किंवा अधिक मदतीसाठी सहाय्यता शिक्षणाशी संपर्क साधा.",
-
   "selectDbFileDescription": "रुग्ण, OPD भेटी, क्लिनिक सेटिंग्ज आणि दिनदर्शिका टिपणे आयात करण्यासाठी तुमच्या डेस्कटॉप ॲपवरून clinic.db फाइल निवडा.",
   "databaseFile": "डेटाबेस फाइल",
   "tapToSelectDbFile": "clinic.db फाइल निवडण्यासाठी टॅप करा",
@@ -424,14 +394,12 @@
   "tryAgain": "पुन्हा प्रयत्न करा",
   "importFailedError": "आयात अनपेक्षितरित्या अयशस्वी: {error}",
   "failedToPickFile": "फाइल निवडण्यात अयशस्वी: {error}",
-
   "patientIdAge": "आयडी: {id} • वय: {age}",
   "visitTime": "वेळ: {time}",
   "todayPeriod": "आज",
   "thisWeekPeriod": "हा आठवडा",
   "thisMonthPeriod": "हा महिना",
   "periodRevenue": "{period} महसूल",
-
   "specialtyDesignation": "वैशिष्ट्य / पदनाम",
   "medicalLicenseNumber": "वैद्यकीय परवाना क्रमांक",
   "emailAddress": "ईमेल पत्ता",
@@ -452,7 +420,6 @@
   "googleSignInFailedMessage": "Google Sign-In अयशस्वी: {error}",
   "syncFailedMessage": "सिंक अयशस्वी: {error}",
   "disconnectFailedMessage": "डिस्कनेक्ट करण्यात अयशस्वी: {error}",
-
   "chatPromptAddPatient": "नवीन रुग्ण कसा जोडायचा?",
   "chatPromptExportData": "मागील महिन्याचा डेटा एक्स्पोर्ट करा",
   "chatPromptAppointments": "आजच्या भेटी दाखवा",
@@ -462,7 +429,6 @@
   "chatResponseAppointments": "आजच्या भेटी पाहण्यासाठी:\n\n1. डॅशबोर्डवरील \"दिनदर्शिका\" आयकन टॅप करा.\n2. आजची तारीख हायलाइट केलेली आहे — आजच्या सर्व भेटी यादीत दिसतील.\n3. तपशील पाहण्यासाठी किंवा संपादित करण्यासाठी कोणत्याही भेटीवर टॅप करा.\n\nतुम्ही दिनदर्शिका स्क्रीनवरून नवीन भेटी जोडू शकता.",
   "chatResponsePrescription": "MediHive मधील औषधपत्रात समाविष्ट आहे:\n\n• रुग्णाचे नाव, वय, लिंग\n• निदान\n• मात्रा आणि कालावधीसह औषधे\n• क्लिनिकल टिपणे\n• डॉक्टरचे नाव, क्लिनिक माहिती आणि परवाना क्रमांक\n• सल्लामसलत आणि औषध शुल्क\n• फॉलो-अप तारीख (पर्यायी)\n\nऔषधपत्र तयार करण्यासाठी: रुग्ण तपशीलवर जा → \"औषधपत्र तयार करा\" टॅप करा.\nPDF आपोआप तयार होतो आणि WhatsApp द्वारे शेअर करता येतो.",
   "chatOpenAction": "उघडा →",
-
   "faqBackupTitle": "माझा डेटा कसा बॅकअप घ्यायचा?",
   "faqBackupAnswer": "सेटिंग्ज > बॅकअप आणि क्लाउड सिंकवर जा आणि स्थानिक बॅकअप तयार करण्यासाठी किंवा क्लाउड स्टोरेजशी सिंक करण्यासाठी \"बॅकअप तयार करा\" वर क्लिक करा.",
   "faqExportTitle": "मी रुग्ण नोंदी एक्स्पोर्ट करू शकतो का?",
@@ -476,7 +442,6 @@
   "platformMobile": "मोबाईल (Android/iOS)",
   "lastUpdatedDate": "मे 2026",
   "backupStoragePath": "आंतरिक स्टोरेज/MediHive/backup",
-
   "createClinicAccount": "क्लिनिक खाते तयार करा",
   "registerClinicSubtitle": "सुरू करण्यासाठी तुमचे क्लिनिक नोंदवा",
   "clinicNameRequired": "क्लिनिकचे नाव आवश्यक",
@@ -496,16 +461,13 @@
   "passwordsDoNotMatchExclaim": "पासवर्ड जुळत नाहीत!",
   "usernameAlreadyExists": "वापरकर्ता नाव आधीपासून अस्तित्वात आहे. दुसरे वापरून पहा.",
   "registrationFailed": "नोंद अयशस्वी. तुमचे कनेक्शन तपासा.",
-
   "newClinicCreateAccount": "नवीन क्लिनिक? खाते तयार करा",
-
   "appointmentReminders": "भेटी आठवणे",
   "appointmentRemindersDesc": "आगामी भेटींसाठी आठवणे",
   "appointmentReminderTitle": "भेटीची आठवण",
   "appointmentReminderBody": "तुमच्याकडे {patientName} शी १० मिनिटांमध्ये भेट आहे",
   "pushNotificationsChannel": "पुश सूचना",
   "pushNotificationsDesc": "सर्व्हरवरून पुश सूचना",
-
   "backupGenFailed": "बॅकअप तयार करण्यात अयशस्वी: {error}",
   "googleDriveUsed": "Google Drive वापर: तुमच्या Drive स्टोरेजपैकी {usage}",
   "restoreInProgress": "डेटा पुनर्संचयन होत आहे",
@@ -520,5 +482,9 @@
   "yesterdayAt": "काल {time} वेळी",
   "weight": "वजन",
   "enterWeight": "वजन प्रविष्ट करा (किलो)",
-  "invalidWeight": "कृपया वैध वजन प्रविष्ट करा (उदा. ७२.५)"
+  "invalidWeight": "कृपया वैध वजन प्रविष्ट करा (उदा. ७२.५)",
+  "emailOrUsername": "ईमेल किंवा वापरकर्ता नाव",
+  "@emailOrUsername": {
+    "description": "Label for email/username input field"
+  }
 }

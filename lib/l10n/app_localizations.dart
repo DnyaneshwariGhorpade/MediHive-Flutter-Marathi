@@ -2995,6 +2995,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please enter a valid weight (e.g. 72.5)'**
   String get invalidWeight;
+
+  /// Label for email/username input field
+  ///
+  /// In en, this message translates to:
+  /// **'Email or username'**
+  String get emailOrUsername;
 }
 
 class _AppLocalizationsDelegate

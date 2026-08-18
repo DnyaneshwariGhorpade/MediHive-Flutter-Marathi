@@ -1592,4 +1592,7 @@ class AppLocalizationsMr extends AppLocalizations {
 
   @override
   String get invalidWeight => 'कृपया वैध वजन प्रविष्ट करा (उदा. ७२.५)';
+
+  @override
+  String get emailOrUsername => 'ईमेल किंवा वापरकर्ता नाव';
 }

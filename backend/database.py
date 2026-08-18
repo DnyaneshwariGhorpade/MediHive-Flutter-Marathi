@@ -609,6 +609,10 @@ def _init_db():
                 created_at      TEXT NOT NULL
             );
         """)
+        # ── Schema migration: add email column to users ──
+        db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE")
+        db.execute("UPDATE users SET email = username WHERE username LIKE '%%@%%' AND email IS NULL")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL")
         db.commit()
         _db_initialized = True
     except Exception as e:

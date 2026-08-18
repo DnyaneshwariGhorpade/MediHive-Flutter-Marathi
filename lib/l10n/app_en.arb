@@ -3,7 +3,11 @@
   "appName": "MediHive",
   "appVersion": "MediHive {version}",
   "@appVersion": {
-    "placeholders": {"version": {"type": "String"}}
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
   },
   "appTagline": "Smart Clinic Management",
   "professionalHealthcare": "Professional Healthcare Management",
@@ -18,13 +22,11 @@
   "logIn": "LOG IN",
   "signInWithGoogle": "SIGN IN WITH GOOGLE",
   "googleSignInFailed": "Google Sign-In failed",
-
   "home": "Home",
   "opd": "OPD",
   "patients": "Patients",
   "calendar": "Calendar",
   "settings": "Settings",
-
   "settingsTitle": "Settings",
   "account": "Account",
   "doctorProfile": "Doctor Profile",
@@ -44,12 +46,10 @@
   "cancel": "Cancel",
   "saveChanges": "Save Changes",
   "healthcareManagementSystem": "Healthcare Management System",
-
   "language": "Language",
   "english": "English",
   "marathi": "Marathi",
   "selectLanguage": "Select Language",
-
   "goodMorning": "Good Morning",
   "goodAfternoon": "Good Afternoon",
   "goodEvening": "Good Evening",
@@ -70,7 +70,6 @@
   "weekly": "Weekly",
   "monthly": "Monthly",
   "yearly": "Yearly",
-
   "opdQueue": "OPD Queue",
   "today": "Today",
   "selectedDate": "Selected date",
@@ -88,7 +87,6 @@
   "years": "years",
   "notSpecified": "Not Specified",
   "newOpd": "New OPD",
-
   "opdRegistration": "OPD Registration",
   "patientInformation": "Patient Information",
   "medicalClinicalDetails": "Medical & Clinical Details",
@@ -156,12 +154,10 @@
   "recordSaved": "Record Saved!",
   "patientAddedSuccessfully": "Patient added successfully",
   "failedToSaveRecord": "Failed to save record. Please try again.",
-
   "patientManagement": "Patient Management",
   "noPatientsYet": "No Patients Yet",
   "noPatientsOnDate": "No Patients on This Date",
   "addPatientViaOpd": "Add your first patient via OPD Registration",
-
   "patientDetails": "Patient Details",
   "patientNotFound": "Patient not found",
   "contactInformation": "Contact Information",
@@ -176,7 +172,6 @@
   "delete": "Delete",
   "whatsappOpened": "WhatsApp opened with prescription attached",
   "noValidPhone": "Patient has no valid phone number",
-
   "editPatient": "Edit Patient",
   "patientInformationLabel": "Patient Information",
   "nameRequired": "Name is required",
@@ -184,7 +179,6 @@
   "enterAtLeast10": "Enter at least 10 digits",
   "patientUpdated": "Patient {name} updated",
   "errorSaving": "Error saving: {error}",
-
   "prescription": "Prescription",
   "medicinesPrescribed": "Medicines Prescribed",
   "medicineName": "Medicine Name",
@@ -197,7 +191,6 @@
   "tapEditIcon": "Tap the edit icon to make changes",
   "prescriptionSaved": "Prescription saved",
   "failedToSavePrescription": "Failed to save prescription: {error}",
-
   "notificationsTitle": "Notifications",
   "markAllAsRead": "Mark all as read",
   "clearAll": "Clear all",
@@ -206,7 +199,6 @@
   "hoursAgo": "{hours} hours ago",
   "yesterday": "Yesterday",
   "noNotifications": "No notifications yet",
-
   "helpAndSupport": "Help & Support",
   "developerInformation": "Developer Information",
   "forTechnicalQueries": "For Technical queries:",
@@ -217,43 +209,34 @@
   "lastUpdated": "Last Updated:",
   "backupInformation": "Backup Information",
   "backupFilesStored": "Backup files are stored locally on your system.",
-
   "backupAndRestore": "Backup & Restore",
   "autoSync": "Auto Sync",
   "syncFrequency": "Sync Frequency",
   "wifiOnly": "WiFi Only",
   "driveUsage": "Drive Usage",
   "restore": "Restore",
-
   "authenticationTitle": "Authentication",
   "changePassword": "Change Password",
   "currentPassword": "Current Password",
   "newPassword": "New Password",
   "confirmPassword": "Confirm Password",
-
   "importFromDesktopTitle": "Import from Desktop",
   "selectFile": "Select File",
   "importData": "Import Data",
-
   "chatbotTitle": "MediHive Assistant",
   "chatPlaceholder": "Type a message...",
-
   "forgotPasswordTitle": "Forgot Password",
   "verifyUsername": "Verify Username",
   "resetPassword": "Reset Password",
-
   "twoFactorVerifyTitle": "Two-Factor Verification",
   "enterVerificationCode": "Enter your verification code",
   "verify": "Verify",
   "useBackupCode": "Use a backup code instead",
   "backupCodesRemaining": "You have {count} backup code(s) remaining",
-
   "smartClinicManagement": "Smart Clinic Management",
-
   "weeklyLabel": "Weekly",
   "monthlyLabel": "Monthly",
   "yearlyLabel": "Yearly",
-
   "googleDriveSync": "Google Drive Sync",
   "cloudBackupActive": "Cloud Backup Active",
   "keepDataSecure": "Keep your clinic data secure",
@@ -268,24 +251,34 @@
   "syncingData": "Syncing data...",
   "connectingToGoogleDrive": "Connecting to Google Drive...",
   "googleDriveDisconnected": "Google Drive disconnected.",
-
   "noPrescriptionRecords": "No prescription records found",
   "failedToLoadPrescription": "Failed to load prescription: {error}",
   "@failedToLoadPrescription": {
-    "placeholders": {"error": {"type": "String"}}
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "errorSavingPrescription": "Error saving prescription: {error}",
   "@errorSavingPrescription": {
-    "placeholders": {"error": {"type": "String"}}
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "errorPrintingPrescription": "Error printing prescription: {error}",
   "@errorPrintingPrescription": {
-    "placeholders": {"error": {"type": "String"}}
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "printLabel": "Print",
   "noNewNotifications": "No new notifications",
   "allCaughtUp": "All caught up!",
-
   "usernameNotFound": "Username not found",
   "passwordsDoNotMatch": "Passwords do not match",
   "passwordTooShort": "Password must be at least 4 characters",
@@ -298,25 +291,27 @@
   "confirmYourPassword": "Confirm your password",
   "enterYourUsername": "Enter your username",
   "backToLogin": "Back to Login",
-
   "invalidBackupCode": "Invalid backup code",
   "enterBackupCode": "Enter backup code",
   "enterValidBackupCode": "Enter a valid backup code (e.g. ABCD-1234)",
-
   "todaysFollowUps": "Today's Follow-ups",
   "upcomingFollowUps": "Upcoming Follow-ups",
   "noFollowUpsToday": "No follow-ups today.",
   "noFollowUpsOnDate": "No follow-ups on this date.",
   "nScheduled": "{count} Scheduled",
-  "@nScheduled": {"placeholders": {"count": {"type": "int"}}},
+  "@nScheduled": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "noteAdded": "Note added",
   "addClinicalReminders": "Add clinical reminders, doctor schedule notes...",
-
   "location": "Location:",
   "dataAndPrivacy": "Data & Privacy",
   "dataPrivacyDescription": "All patient data is stored locally on your system. MediHive does not upload or share any data with external servers. Your data remains completely private and secure on your local machine.",
   "frequentlyAskedQuestions": "Frequently Asked Questions",
-
   "backupAndCloudSyncTitle": "Backup & Cloud Sync",
   "localBackup": "Local Backup",
   "exportAndShareLocally": "Export & Share patient data locally",
@@ -342,9 +337,21 @@
   "doNotSyncOnCellular": "Do not sync on cellular networks",
   "dailyBackgroundBackup": "Daily Background Backup",
   "scheduledAt": "Scheduled at {time}",
-  "@scheduledAt": {"placeholders": {"time": {"type": "String"}}},
+  "@scheduledAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "syncingNRecords": "Syncing {count} records...",
-  "@syncingNRecords": {"placeholders": {"count": {"type": "int"}}},
+  "@syncingNRecords": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "syncNowBtn": "Sync Now",
   "uploadToDriveBtn": "Upload to Drive",
   "uploading": "Uploading...",
@@ -353,54 +360,143 @@
   "fetchingHistory": "Fetching history from Google Drive...",
   "noBackupsInDrive": "No backups found in Google Drive.",
   "backupFileSize": "Backup file ({size})",
-  "@backupFileSize": {"placeholders": {"size": {"type": "String"}}},
+  "@backupFileSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
   "nRecordsSynced": "{count} records synced",
-  "@nRecordsSynced": {"placeholders": {"count": {"type": "int"}}},
+  "@nRecordsSynced": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "restoreBackupTitle": "Restore Backup",
   "restoreWarning": "This will completely replace all your current patient database, OPD registrations, and calendar appointments with the backup data. This action cannot be undone.\n\nDo you want to continue?",
   "restoreDataBtn": "Restore Data",
   "downloadingBackup": "Downloading backup file...",
   "restoringNRecords": "Restoring {count} records...",
-  "@restoringNRecords": {"placeholders": {"count": {"type": "int"}}},
+  "@restoringNRecords": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "restoredNRecords": "Restored {count} records successfully!",
-  "@restoredNRecords": {"placeholders": {"count": {"type": "int"}}},
+  "@restoredNRecords": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "preparingBackupToShare": "Preparing backup file to share...",
   "uploadToDriveQuestion": "Upload to Drive?",
   "backupSavedUploadPrompt": "Backup saved locally. Upload to Google Drive as well?",
   "no": "No",
   "upload": "Upload",
   "backupSavedLocally": "Backup saved locally: {file}",
-  "@backupSavedLocally": {"placeholders": {"file": {"type": "String"}}},
+  "@backupSavedLocally": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
   "generatingBackup": "Generating {period} backup...",
-  "@generatingBackup": {"placeholders": {"period": {"type": "String"}}},
+  "@generatingBackup": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
   "restoreFailed": "Restore failed: {error}",
-  "@restoreFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@restoreFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "shareFailed": "Share failed: {error}",
-  "@shareFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@shareFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "syncedSuccessfully": "Synced successfully",
   "syncFailed": "Sync failed",
   "syncFailedRetry": "Sync failed. Retry?",
   "uploadFailed": "Upload failed: {error}",
-  "@uploadFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@uploadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "failedToFetchDriveUsage": "Could not fetch Drive usage",
   "failedToLoadBackupHistory": "Failed to load backup history: {error}",
-  "@failedToLoadBackupHistory": {"placeholders": {"error": {"type": "String"}}},
+  "@failedToLoadBackupHistory": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "failedToConnect": "Failed to connect: {error}",
-  "@failedToConnect": {"placeholders": {"error": {"type": "String"}}},
+  "@failedToConnect": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "failedToDisconnect": "Failed to disconnect: {error}",
-  "@failedToDisconnect": {"placeholders": {"error": {"type": "String"}}},
+  "@failedToDisconnect": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "backupScheduledAt": "Automatic backup scheduled at {time}",
-  "@backupScheduledAt": {"placeholders": {"time": {"type": "String"}}},
-
+  "@backupScheduledAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "updatePassword": "Update Password",
   "updateLoginCredentials": "Update your login credentials",
   "enterLabel": "Enter {label}",
-  "@enterLabel": {"placeholders": {"label": {"type": "String"}}},
+  "@enterLabel": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
   "pleaseEnterCurrentPassword": "Please enter your current password.",
   "currentPasswordIncorrect": "Current password is incorrect!",
   "passwordChangedSuccessfully": "Password changed successfully!",
   "failedToUpdatePassword": "Failed to update password: {error}",
-  "@failedToUpdatePassword": {"placeholders": {"error": {"type": "String"}}},
+  "@failedToUpdatePassword": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "twoFactorAuthentication": "Two-Factor Authentication",
   "extraSecurityActive": "Extra security is active",
   "addExtraSecurityLayer": "Add extra security layer",
@@ -426,7 +522,6 @@
   "currentDevice": "Current Device",
   "sessionActive": "Session active",
   "activeLabel": "Active",
-
   "aiAssistant": "AI Assistant",
   "alwaysHereToHelp": "Always here to help",
   "helloAssistant": "Hello, I am your MediHive AI Assistant",
@@ -437,7 +532,6 @@
   "openCalendar": "Open Calendar →",
   "viewPatientList": "View Patient List →",
   "demoAssistantMessage": "I'm a demo assistant with predefined answers. Try one of the suggested prompts above, or contact support for more help.",
-
   "selectDbFileDescription": "Select the clinic.db file from your desktop app to import patients, OPD visits, clinic settings, and calendar notes.",
   "databaseFile": "Database File",
   "tapToSelectDbFile": "Tap to select clinic.db file",
@@ -453,26 +547,51 @@
   "importFailed": "Import Failed",
   "tryAgain": "Try Again",
   "importFailedError": "Import failed unexpectedly: {error}",
-  "@importFailedError": {"placeholders": {"error": {"type": "String"}}},
+  "@importFailedError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "failedToPickFile": "Failed to pick file: {error}",
-  "@failedToPickFile": {"placeholders": {"error": {"type": "String"}}},
-
+  "@failedToPickFile": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "patientIdAge": "ID: {id} • Age {age}",
   "@patientIdAge": {
-    "placeholders": {"id": {"type": "String"}, "age": {"type": "String"}}
+    "placeholders": {
+      "id": {
+        "type": "String"
+      },
+      "age": {
+        "type": "String"
+      }
+    }
   },
   "visitTime": "Time: {time}",
   "@visitTime": {
-    "placeholders": {"time": {"type": "String"}}
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
   },
   "todayPeriod": "Today",
   "thisWeekPeriod": "This Week",
   "thisMonthPeriod": "This Month",
   "periodRevenue": "{period} Revenue",
   "@periodRevenue": {
-    "placeholders": {"period": {"type": "String"}}
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
   },
-
   "specialtyDesignation": "Specialty / Designation",
   "medicalLicenseNumber": "Medical License Number",
   "emailAddress": "Email Address",
@@ -488,30 +607,53 @@
   "clinicNameAddressRequired": "Clinic Name and Address are required!",
   "licenseLabel": "License: {number}",
   "@licenseLabel": {
-    "placeholders": {"number": {"type": "String"}}
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
   },
   "googleUserFallback": "Google User",
   "savedSuccessfully": "{title} updated successfully!",
   "@savedSuccessfully": {
-    "placeholders": {"title": {"type": "String"}}
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
   },
   "failedToSave": "Failed to save: {error}",
   "@failedToSave": {
-    "placeholders": {"error": {"type": "String"}}
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "googleSignInFailedMessage": "Google Sign-In failed: {error}",
   "@googleSignInFailedMessage": {
-    "placeholders": {"error": {"type": "String"}}
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "syncFailedMessage": "Sync failed: {error}",
   "@syncFailedMessage": {
-    "placeholders": {"error": {"type": "String"}}
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "disconnectFailedMessage": "Failed to disconnect: {error}",
   "@disconnectFailedMessage": {
-    "placeholders": {"error": {"type": "String"}}
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
-
   "chatPromptAddPatient": "How do I add a new patient?",
   "chatPromptExportData": "Export last month's data",
   "chatPromptAppointments": "Show me today's appointments",
@@ -521,7 +663,6 @@
   "chatResponseAppointments": "To view today's appointments:\n\n1. Tap the \"Calendar\" icon on the Dashboard.\n2. Today's date is highlighted — all appointments for today will be listed.\n3. Tap any appointment to view or edit details.\n\nYou can also add new appointments from the Calendar screen.",
   "chatResponsePrescription": "A prescription in MediHive includes:\n\n• Patient name, age, gender\n• Diagnosis\n• Medicines with dosage & duration\n• Clinical notes\n• Doctor's name, clinic info & license number\n• Consultation & medicine fees\n• Follow-up date (optional)\n\nTo create a prescription: go to Patient Details → tap \"Create Prescription\".\nThe PDF is generated automatically and can be shared via WhatsApp.",
   "chatOpenAction": "Open →",
-
   "faqBackupTitle": "How do I backup my data?",
   "faqBackupAnswer": "Go to Settings > Backup & Cloud Sync and click on \"Generate Backup\" to create a local backup or sync with cloud storage.",
   "faqExportTitle": "Can I export patient records?",
@@ -535,7 +676,6 @@
   "platformMobile": "Mobile (Android/iOS)",
   "lastUpdatedDate": "May 2026",
   "backupStoragePath": "Internal Storage/MediHive/backup",
-
   "createClinicAccount": "Create Clinic Account",
   "registerClinicSubtitle": "Register your clinic to get started",
   "clinicNameRequired": "Clinic name required",
@@ -555,26 +695,35 @@
   "passwordsDoNotMatchExclaim": "Passwords do not match!",
   "usernameAlreadyExists": "Username already exists. Try another.",
   "registrationFailed": "Registration failed. Check your connection.",
-
   "newClinicCreateAccount": "New clinic? Create an account",
-
   "appointmentReminders": "Appointment Reminders",
   "appointmentRemindersDesc": "Reminders for upcoming appointments",
   "appointmentReminderTitle": "Appointment Reminder",
   "appointmentReminderBody": "You have an appointment with {patientName} in 10 minutes",
   "@appointmentReminderBody": {
-    "placeholders": {"patientName": {"type": "String"}}
+    "placeholders": {
+      "patientName": {
+        "type": "String"
+      }
+    }
   },
   "pushNotificationsChannel": "Push Notifications",
   "pushNotificationsDesc": "Push notifications from server",
-
   "backupGenFailed": "Backup generation failed: {error}",
   "@backupGenFailed": {
-    "placeholders": {"error": {"type": "String"}}
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "googleDriveUsed": "Google Drive used: {usage} of your Drive storage",
   "@googleDriveUsed": {
-    "placeholders": {"usage": {"type": "String"}}
+    "placeholders": {
+      "usage": {
+        "type": "String"
+      }
+    }
   },
   "restoreInProgress": "Restoring Data",
   "dailyFrequency": "Daily",
@@ -585,10 +734,26 @@
   "unknownDate": "Unknown Date",
   "shareBackupText": "MediHive Backup - Clinic Data Export",
   "todayAt": "Today at {time}",
-  "@todayAt": {"placeholders": {"time": {"type": "String"}}},
+  "@todayAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "yesterdayAt": "Yesterday at {time}",
-  "@yesterdayAt": {"placeholders": {"time": {"type": "String"}}},
+  "@yesterdayAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "weight": "Weight",
   "enterWeight": "Enter weight (kg)",
-  "invalidWeight": "Please enter a valid weight (e.g. 72.5)"
+  "invalidWeight": "Please enter a valid weight (e.g. 72.5)",
+  "emailOrUsername": "Email or username",
+  "@emailOrUsername": {
+    "description": "Label for email/username input field"
+  }
 }

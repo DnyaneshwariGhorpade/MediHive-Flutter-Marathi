@@ -61,6 +61,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         username: _usernameCtrl.text.trim(),
         password: _passwordCtrl.text,
         name: _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
         clinicName: _clinicNameCtrl.text.trim(),
         clinicEmail: _emailCtrl.text.trim(),
         clinicPhone: _clinicPhoneCtrl.text.trim(),

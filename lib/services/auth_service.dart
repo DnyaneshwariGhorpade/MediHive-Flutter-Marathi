@@ -21,9 +21,6 @@ class AppUser {
 }
 
 class AuthService {
-  /// Standard email/password login via Flask API.
-  /// If the server is unreachable, validates against credentials
-  /// stored in assets/.env (LOCAL_USERNAME / LOCAL_PASSWORD).
   Future<AppUser?> login(String username, String password) async {
     try {
       final data = await ApiService.login(username, password);
@@ -33,7 +30,7 @@ class AuthService {
       return AppUser(
         id: user['id']?.toString() ?? '',
         name: user['name']?.toString() ?? 'Doctor',
-        email: '${user['username']}@medihive.com',
+        email: user['email']?.toString() ?? '$username@medihive.com',
         clinicId: clinicId,
       );
     } catch (e) {
@@ -42,9 +39,9 @@ class AuthService {
       final envPass = dotenv.env['LOCAL_PASSWORD'];
       if (username == envUser && password == envPass) {
         return AppUser(
-          id: '1',
+          id: dotenv.env['GOOGLE_USER_ID'] ?? '1',
           name: 'Dr. $username',
-          email: '$username@medihive.com',
+          email: dotenv.env['LOCAL_USERNAME'] ?? '$username@medihive.com',
         );
       }
       final prefs = await SharedPreferences.getInstance();
@@ -52,7 +49,7 @@ class AuthService {
       final savedUser = prefs.getString('app_username');
       if (username == (savedUser ?? envUser) && password == savedPass) {
         return AppUser(
-          id: '1',
+          id: dotenv.env['GOOGLE_USER_ID'] ?? '1',
           name: 'Dr. $username',
           email: '$username@medihive.com',
         );
@@ -61,16 +58,14 @@ class AuthService {
     }
   }
 
-  /// Register a new user via Flask API.
-  /// Falls back to local registration in SharedPreferences.
-  Future<AppUser?> register(String username, String password, {String name = 'Doctor'}) async {
+  Future<AppUser?> register(String username, String password, {String name = 'Doctor', String? email}) async {
     try {
-      final data = await ApiService.register(username, password, name: name);
+      final data = await ApiService.register(username, password, name: name, email: email);
       final user = data['user'] as Map<String, dynamic>;
       return AppUser(
         id: user['id']?.toString() ?? '',
         name: user['name']?.toString() ?? 'Doctor',
-        email: '${user['username']}@medihive.com',
+        email: user['email']?.toString() ?? '',
       );
     } catch (e) {
       debugPrint('AuthService.register: API failed, saving locally: $e');
@@ -85,67 +80,61 @@ class AuthService {
     }
   }
 
-  Future<AppUser?> _ensureFlaskToken({
-    required String id,
-    required String name,
-    required String email,
-    String? photoUrl,
-  }) async {
-    const flaskPassword = 'medihive-google-user';
-    String clinicId = '';
-    try {
-      await ApiService.register(email, flaskPassword, name: name);
-    } catch (_) {}
-    try {
-      final data = await ApiService.login(email, flaskPassword);
-      final user = data['user'] as Map<String, dynamic>?;
-      clinicId = user?['clinic_id']?.toString() ?? '';
-    } catch (e) {
-      debugPrint('AuthService: Flask login after Google sign-in failed: $e');
-    }
-    return AppUser(id: id, name: name, email: email, photoUrl: photoUrl, clinicId: clinicId);
-  }
-
-  /// Google Sign In — delegates to GoogleAuthService (single shared instance)
+  /// Google Sign In — authenticates Google on device (for Drive/Sheets access),
+  /// then logs into the backend using the doctor's env-configured credentials.
   Future<AppUser?> signInWithGoogle() async {
     try {
       final account = await GoogleAuthService().signInWithGoogle();
-      if (account != null) {
-        return await _ensureFlaskToken(
-          id: account.id,
-          name: account.displayName ?? 'Doctor',
-          email: account.email,
-          photoUrl: account.photoUrl,
-        );
+      if (account == null) return null;
+
+      final envUser = dotenv.env['GOOGLE_USERNAME'] ?? dotenv.env['LOCAL_USERNAME'] ?? '';
+      final envPass = dotenv.env['LOCAL_PASSWORD'] ?? '';
+      if (envUser.isEmpty || envPass.isEmpty) {
+        debugPrint('AuthService: GOOGLE_USERNAME/LOCAL_PASSWORD not set in .env');
+        return null;
       }
+
+      final data = await ApiService.login(envUser, envPass);
+      final user = data['user'] as Map<String, dynamic>;
+      final clinicId = user['clinic_id']?.toString() ?? '';
+      debugPrint('AuthService: Google login -> backend user_id=${user['id']}, clinic_id=$clinicId');
+      return AppUser(
+        id: user['id']?.toString() ?? dotenv.env['GOOGLE_USER_ID'] ?? '1',
+        name: user['name']?.toString() ?? account.displayName ?? 'Doctor',
+        email: user['email']?.toString() ?? account.email,
+        photoUrl: account.photoUrl,
+        clinicId: clinicId,
+      );
     } catch (e) {
       debugPrint('AuthService.signInWithGoogle error: $e');
     }
     return null;
   }
 
-  /// Silent sign in for Google
   Future<AppUser?> signInSilently() async {
     try {
       final signedIn = await GoogleAuthService().isSignedIn();
-      if (signedIn) {
-        final account = GoogleAuthService().currentUser;
-        if (account != null) {
-          return await _ensureFlaskToken(
-            id: account.id,
-            name: account.displayName ?? 'Doctor',
-            email: account.email,
-            photoUrl: account.photoUrl,
-          );
-        }
-      }
+      if (!signedIn) return null;
+
+      final envUser = dotenv.env['GOOGLE_USERNAME'] ?? dotenv.env['LOCAL_USERNAME'] ?? '';
+      final envPass = dotenv.env['LOCAL_PASSWORD'] ?? '';
+      if (envUser.isEmpty || envPass.isEmpty) return null;
+
+      final data = await ApiService.login(envUser, envPass);
+      final user = data['user'] as Map<String, dynamic>;
+      final clinicId = user['clinic_id']?.toString() ?? '';
+      return AppUser(
+        id: user['id']?.toString() ?? dotenv.env['GOOGLE_USER_ID'] ?? '1',
+        name: user['name']?.toString() ?? 'Doctor',
+        email: user['email']?.toString() ?? '$envUser@medihive.com',
+        clinicId: clinicId,
+      );
     } catch (e) {
       debugPrint('AuthService.signInSilently error: $e');
     }
     return null;
   }
 
-  /// Logout
   Future<void> logout() async {
     await ApiService.clearToken();
     try {

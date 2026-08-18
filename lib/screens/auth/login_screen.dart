@@ -230,7 +230,8 @@ class _LoginScreenState extends State<LoginScreen>
               controller: _usernameController,
               enabled: !auth.isLoading,
               textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.username],
+              autofillHints: const [AutofillHints.username, AutofillHints.email],
+              keyboardType: TextInputType.emailAddress,
               onChanged: (value) {
                 _lastSyncedUsername = value;
                 auth.setUsername(value);
@@ -246,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen>
                 fontSize: 15,
               ),
               decoration: InputDecoration(
-                labelText: AppLocalizations.of(context)!.username,
+                labelText: AppLocalizations.of(context)!.emailOrUsername,
                 labelStyle: TextStyle(
                   color: AppTheme.textSecondary,
                   fontSize: 14,

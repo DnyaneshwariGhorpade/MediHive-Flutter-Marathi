@@ -1586,4 +1586,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invalidWeight => 'Please enter a valid weight (e.g. 72.5)';
+
+  @override
+  String get emailOrUsername => 'Email or username';
 }

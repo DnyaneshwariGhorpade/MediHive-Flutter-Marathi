@@ -88,11 +88,17 @@ static String get baseUrl =>
     return data;
   }
 
-  static Future<Map<String, dynamic>> register(String username, String password, {String name = 'Doctor'}) async {
+  static Future<Map<String, dynamic>> register(String username, String password, {String name = 'Doctor', String? email}) async {
+    final body = <String, dynamic>{
+      'username': username,
+      'password': password,
+      'name': name,
+    };
+    if (email != null && email.isNotEmpty) body['email'] = email;
     final res = await http.post(
       Uri.parse('$baseUrl/auth/register'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username, 'password': password, 'name': name}),
+      body: jsonEncode(body),
     ).timeout(const Duration(seconds: 5));
     final data = await _handleResponse(res);
     await saveToken(data['token']);
@@ -210,23 +216,26 @@ static String get baseUrl =>
     required String username,
     required String password,
     String name = 'Doctor',
+    String? email,
     required String clinicName,
     String clinicEmail = '',
     String clinicPhone = '',
     String clinicAddress = '',
   }) async {
+    final body = <String, dynamic>{
+      'username': username,
+      'password': password,
+      'name': name,
+      'clinic_name': clinicName,
+      'clinic_email': clinicEmail,
+      'clinic_phone': clinicPhone,
+      'clinic_address': clinicAddress,
+    };
+    if (email != null && email.isNotEmpty) body['email'] = email;
     final res = await http.post(
       Uri.parse('$baseUrl/auth/register-clinic'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'username': username,
-        'password': password,
-        'name': name,
-        'clinic_name': clinicName,
-        'clinic_email': clinicEmail,
-        'clinic_phone': clinicPhone,
-        'clinic_address': clinicAddress,
-      }),
+      body: jsonEncode(body),
     ).timeout(const Duration(seconds: 10));
     final data = await _handleResponse(res);
     await saveToken(data['token']);
