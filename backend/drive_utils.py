@@ -23,7 +23,8 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 def get_drive_service():
     creds = None
-    
+
+    # 1. Try OAuth token from drive_token.json / DRIVE_TOKEN_JSON first (required for Drive storage quota)
     from config import DRIVE_TOKEN_JSON
     if DRIVE_TOKEN_JSON and not os.path.exists(DRIVE_TOKEN_PATH):
         try:
@@ -33,7 +34,6 @@ def get_drive_service():
         except Exception as e:
             logger.error("Failed to write DRIVE_TOKEN_JSON to file: %s", e)
 
-    # Try OAuth token from drive_token.json
     try:
         if os.path.exists(DRIVE_TOKEN_PATH):
             auth = GoogleAuthService(DRIVE_TOKEN_PATH)
@@ -42,8 +42,8 @@ def get_drive_service():
                 logger.info("Successfully loaded OAuth credentials for Google Drive")
     except Exception as e:
         logger.warning("Failed to load OAuth credentials from %s: %s. Trying service account...", DRIVE_TOKEN_PATH, e)
-        
-    # Fallback to Service Account Credentials
+
+    # 2. Fallback to Service Account Credentials (e.g. for Google Workspace Shared Drives)
     if creds is None:
         try:
             if GOOGLE_CREDENTIALS_JSON:
@@ -55,7 +55,7 @@ def get_drive_service():
                 logger.info("Loaded Google Drive service account credentials from %s", GOOGLE_CREDENTIALS_PATH)
         except Exception as e:
             logger.error("Failed to load service account credentials for Google Drive: %s", e)
-            
+
     if creds is None:
         raise RuntimeError(
             "Google Drive credentials not available. "

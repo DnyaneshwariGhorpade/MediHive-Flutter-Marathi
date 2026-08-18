@@ -49,21 +49,24 @@ class GoogleAuthService:
         except (json.JSONDecodeError, OSError):
             return None
 
-        creds = Credentials(
-            token=token_data.get("token"),
-            refresh_token=token_data.get("refresh_token"),
-            token_uri=token_data.get("token_uri"),
-            client_id=token_data.get("client_id"),
-            client_secret=token_data.get("client_secret"),
-            scopes=token_data.get("scopes"),
-        )
+        try:
+            creds = Credentials(
+                token=token_data.get("token"),
+                refresh_token=token_data.get("refresh_token"),
+                token_uri=token_data.get("token_uri"),
+                client_id=token_data.get("client_id"),
+                client_secret=token_data.get("client_secret"),
+                scopes=token_data.get("scopes"),
+            )
 
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            self._persist_token(creds)
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                self._persist_token(creds)
 
-        self._creds = creds
-        return creds
+            self._creds = creds
+            return creds
+        except Exception:
+            return None
 
     def get_authorization_url(self, redirect_port: int = 8090) -> str:
         """Build the OAuth consent URL for browser-based authorization.

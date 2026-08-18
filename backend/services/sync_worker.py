@@ -164,11 +164,11 @@ class SyncWorkerThread(threading.Thread):
 
         # Execute Handlers
         # 1. Drive update (must happen before Sheets update so URLs are ready)
+        drive_urls = []
         if state.get("drive_update") == "pending":
             try:
                 logger.info("SyncWorker: Uploading images to Google Drive for OPD %s", entity_id)
                 from drive_utils import upload_image_fileobj_to_drive
-                drive_urls = []
                 for i, filepath in enumerate(image_files, 1):
                     filename = os.path.basename(filepath)
                     wrapper = LocalFileWrapper(filepath, filename)
@@ -204,7 +204,7 @@ class SyncWorkerThread(threading.Thread):
                     opd = OPDRecord.get(entity_id, clinic_id=clinic_id)
                     if opd:
                         patient = Patient.get(opd.get('patient_id'), clinic_id=clinic_id) or {}
-                        row_data = build_sheet_row_data(opd, patient, [])
+                        row_data = build_sheet_row_data(opd, patient, drive_urls)
                         upsert_opd_row_in_sheet(entity_id, row_data)
                         state["sheets_update"] = "success"
                     else:
