@@ -460,6 +460,7 @@ final _router = GoRouter(
       path: '/app/prescription/:id',
       builder: (context, state) => PrescriptionScreen(
         patientId: state.pathParameters['id'] ?? '',
+        opdId: state.uri.queryParameters['opdId'],
       ),
     ),
     GoRoute(

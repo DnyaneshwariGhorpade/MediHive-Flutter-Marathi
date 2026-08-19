@@ -28,6 +28,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
   bool _showFab = true;
   DateTime _selectedDate = DateTime.now();
   Set<String> _datePatientIds = {};
+  Map<String, String> _dateDiagnosisMap = {};
   int _lastPatientCount = -1;
 
   @override
@@ -86,6 +87,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
       final rows = await opdRepo.getByDate(_selectedDate);
       if (rows.isEmpty) {
         _datePatientIds = {};
+        _dateDiagnosisMap = {};
       } else {
         final patientIds = rows.map((r) => r['patient_id'] as int).toSet().toList();
         final db = await DatabaseHelper().database;
@@ -96,14 +98,32 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
           where: 'id IN ($placeholders)',
           whereArgs: patientIds,
         );
-        _datePatientIds = patientRows
-            .map<String>((r) => (r['sync_id'] as String?) ??
-                'P${(r['id'] as int).toString().padLeft(3, '0')}')
-            .where((id) => id.isNotEmpty)
-            .toSet();
+
+        final idToSyncId = <int, String>{};
+        for (final r in patientRows) {
+          final sId = (r['sync_id'] as String?) ??
+              'P${(r['id'] as int).toString().padLeft(3, '0')}';
+          if (sId.isNotEmpty) {
+            idToSyncId[r['id'] as int] = sId;
+          }
+        }
+
+        _datePatientIds = idToSyncId.values.toSet();
+        _dateDiagnosisMap = {};
+        for (final row in rows) {
+          final pid = row['patient_id'] as int;
+          final sId = idToSyncId[pid];
+          if (sId != null) {
+            final diag = row['diagnosis'] as String? ?? '';
+            if (diag.isNotEmpty || !_dateDiagnosisMap.containsKey(sId)) {
+              _dateDiagnosisMap[sId] = diag;
+            }
+          }
+        }
       }
     } catch (_) {
       _datePatientIds = {};
+      _dateDiagnosisMap = {};
     }
     if (mounted) setState(() {});
   }
@@ -331,10 +351,15 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
                           final id = patient.id;
                           final age = patient.age;
                           final gender = patient.gender;
-                          final lastDiagnosis = patient.diagnosis.isNotEmpty
-                              ? patient.diagnosis
-                              : l10n.noDiagnosis;
-                          final lastVisitDate = patient.lastVisit;
+                          final dateDiag = _dateDiagnosisMap[id];
+                          final lastDiagnosis = (dateDiag != null && dateDiag.isNotEmpty)
+                              ? dateDiag
+                              : (patient.diagnosis.isNotEmpty
+                                  ? patient.diagnosis
+                                  : l10n.noDiagnosis);
+                          final lastVisitDate = _isToday
+                              ? patient.lastVisit
+                              : DateFormat('yyyy-MM-dd').format(_selectedDate);
 
                           return AnimatedListItem(
                             index: index,

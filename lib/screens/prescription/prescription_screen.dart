@@ -53,7 +53,8 @@ class _MedicineFieldData {
 
 class PrescriptionScreen extends StatefulWidget {
   final String patientId;
-  const PrescriptionScreen({super.key, required this.patientId});
+  final String? opdId;
+  const PrescriptionScreen({super.key, required this.patientId, this.opdId});
 
   @override
   State<PrescriptionScreen> createState() => _PrescriptionScreenState();
@@ -116,7 +117,17 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
         return;
       }
 
-      _latestRecord = records.first;
+      if (widget.opdId != null && widget.opdId!.isNotEmpty) {
+        final matched = records.cast<Map<String, dynamic>?>().firstWhere(
+          (r) =>
+              r?['opd_id']?.toString() == widget.opdId ||
+              r?['id']?.toString() == widget.opdId,
+          orElse: () => null,
+        );
+        _latestRecord = matched ?? records.first;
+      } else {
+        _latestRecord = records.first;
+      }
 
       if (!mounted) return;
       final settings = context.read<SettingsProvider>();

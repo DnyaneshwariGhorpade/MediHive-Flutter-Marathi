@@ -64,7 +64,22 @@ class SyncWorkerThread(threading.Thread):
         self.stop_event.set()
 
     def run(self):
-        logger.info("Sync background worker thread started.")
+        # Acquire a Postgres advisory lock so only one gunicorn worker runs
+        # the sync worker. If another worker already holds it, exit gracefully.
+        try:
+            db = get_db()
+            lock_acquired = db.execute(
+                "SELECT pg_try_advisory_lock(12345)"
+            ).fetchone()
+            db.close()
+            if not lock_acquired or not lock_acquired[0]:
+                logger.info("Sync worker: another worker holds the advisory lock, skipping.")
+                return
+            logger.info("Sync worker: acquired advisory lock, starting poll loop.")
+        except Exception as e:
+            logger.error("Sync worker: failed to acquire advisory lock: %s", e)
+            # Fall back to running anyway (single-worker mode will work fine)
+
         while not self.stop_event.is_set():
             try:
                 self.process_next_event()
@@ -79,7 +94,30 @@ class SyncWorkerThread(threading.Thread):
             self.stop_event.wait(5.0)
         logger.info("Sync background worker thread stopped.")
 
+    def reap_stale_processing_events(self):
+        """Reset events stuck in 'processing' for >5 minutes back to 'pending'."""
+        try:
+            db = get_db()
+            result = db.execute("""
+                UPDATE sync_queue
+                SET status = 'pending',
+                    retry_count = retry_count + 1,
+                    last_error = 'stale processing claim recovered'
+                WHERE status = 'processing'
+                  AND last_attempt IS NOT NULL
+                  AND EXTRACT(EPOCH FROM timezone('utc', now())) - EXTRACT(EPOCH FROM last_attempt::timestamp) > 300
+            """)
+            if result and result.rowcount > 0:
+                db.commit()
+                logger.warning("Reaper: reset %d stale 'processing' events back to 'pending'", result.rowcount)
+            db.close()
+        except Exception as e:
+            logger.error("Reaper error: %s", e)
+
     def process_next_event(self):
+        # Reap stale 'processing' events (>5 min) so they get retried
+        self.reap_stale_processing_events()
+
         db = get_db()
         # Fetch next pending event using FOR UPDATE SKIP LOCKED
         # Supports exponential backoff (retry after 15 * 2^retry_count seconds)

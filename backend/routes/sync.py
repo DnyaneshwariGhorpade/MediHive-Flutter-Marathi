@@ -403,7 +403,13 @@ def sync_upload():
             remote_updated = p.get('updated_at', '')
             local_updated = existing.get('updated_at', '')
             if _remote_newer_or_equal(remote_updated, local_updated):
-                Patient.update(p['id'], p, clinic_id=clinic_id)
+                # If existing row is under a different clinic, use create (ON
+                # CONFLICT) to reassign clinic_id — the clinic-filtered update
+                # would silently no-op on 0 rows.
+                if existing.get('clinic_id') and existing['clinic_id'] != clinic_id:
+                    Patient.create(p)
+                else:
+                    Patient.update(p['id'], p, clinic_id=clinic_id)
                 results['patients'].append(_format_patient(Patient.get(p['id'])))
                 events_to_enqueue.append(('patient', p['id'], 'upsert'))
             else:
@@ -444,7 +450,13 @@ def sync_upload():
             remote_updated = r.get('updated_at', '')
             local_updated = existing.get('updated_at', '')
             if _remote_newer_or_equal(remote_updated, local_updated):
-                OPDRecord.update(r['id'], r, clinic_id=clinic_id)
+                # If existing row is under a different clinic, use create (ON
+                # CONFLICT) to reassign clinic_id — the clinic-filtered update
+                # would silently no-op on 0 rows.
+                if existing.get('clinic_id') and existing['clinic_id'] != clinic_id:
+                    OPDRecord.create(r)
+                else:
+                    OPDRecord.update(r['id'], r, clinic_id=clinic_id)
                 result = OPDRecord.get(r['id'])
                 events_to_enqueue.append(('opd_visit', r['id'], 'upsert'))
             else:
@@ -486,7 +498,13 @@ def sync_upload():
             remote_updated = a.get('updated_at', '')
             local_updated = existing.get('updated_at', '')
             if _remote_newer_or_equal(remote_updated, local_updated):
-                Appointment.update(a['id'], a, clinic_id=clinic_id)
+                # If existing row is under a different clinic, use create (ON
+                # CONFLICT) to reassign clinic_id — the clinic-filtered update
+                # would silently no-op on 0 rows.
+                if existing.get('clinic_id') and existing['clinic_id'] != clinic_id:
+                    Appointment.create(a)
+                else:
+                    Appointment.update(a['id'], a, clinic_id=clinic_id)
                 results['appointments'].append(Appointment.get(a['id']))
                 events_to_enqueue.append(('appointment', a['id'], 'upsert'))
             else:

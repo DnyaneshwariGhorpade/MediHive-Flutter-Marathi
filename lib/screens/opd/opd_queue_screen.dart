@@ -472,9 +472,13 @@ class _OpdQueueScreenState extends State<OpdQueueScreen> {
                                                 ),
                                                 const SizedBox(width: 8),
                                                 GestureDetector(
-                                                  onTap: () => context.push(
-                                                    '/app/prescription/$patientSyncId',
-                                                  ),
+                                                  onTap: () {
+                                                    final opdId = (record['opd_id'] ?? record['id'] ?? '').toString();
+                                                    final uri = opdId.isNotEmpty
+                                                        ? '/app/prescription/$patientSyncId?opdId=$opdId'
+                                                        : '/app/prescription/$patientSyncId';
+                                                    context.push(uri);
+                                                  },
                                                   child: const Padding(
                                                     padding:
                                                         EdgeInsets.only(left: 2),
