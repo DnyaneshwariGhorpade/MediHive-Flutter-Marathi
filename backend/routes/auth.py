@@ -3,13 +3,33 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from database import get_db
 from datetime import datetime
 import hashlib
-import uuid
+import time
 
 auth_bp = Blueprint('auth', __name__)
+
+# Simple in-memory rate limiter: max attempts per IP within a window
+_rate_limit_store = {}
+_MAX_ATTEMPTS = 10
+_WINDOW_SECONDS = 300  # 5 minutes
+
+
+def _rate_limit_check(ip):
+    now = time.time()
+    key = ip
+    attempts = _rate_limit_store.get(key, [])
+    attempts = [t for t in attempts if now - t < _WINDOW_SECONDS]
+    if len(attempts) >= _MAX_ATTEMPTS:
+        return False
+    attempts.append(now)
+    _rate_limit_store[key] = attempts
+    return True
 
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
+    if not _rate_limit_check(request.remote_addr):
+        return jsonify({'error': 'Too many attempts. Try again later.'}), 429
+
     data = request.get_json()
     if not data:
         return jsonify({'error': 'Request body required'}), 400
@@ -46,6 +66,9 @@ def login():
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
+    if not _rate_limit_check(request.remote_addr):
+        return jsonify({'error': 'Too many attempts. Try again later.'}), 429
+
     data = request.get_json()
     if not data:
         return jsonify({'error': 'Request body required'}), 400
@@ -105,6 +128,9 @@ def register():
 
 @auth_bp.route('/register-clinic', methods=['POST'])
 def register_clinic():
+    if not _rate_limit_check(request.remote_addr):
+        return jsonify({'error': 'Too many attempts. Try again later.'}), 429
+
     data = request.get_json()
     if not data:
         return jsonify({'error': 'Request body required'}), 400
@@ -131,7 +157,8 @@ def register_clinic():
             if email_taken:
                 return jsonify({'error': 'Email already exists'}), 409
 
-        clinic_id = data.get('clinic_id', '').strip() or f'CLI{uuid.uuid4().hex[:8].upper()}'
+        import uuid
+        clinic_id = f'CLI{uuid.uuid4().hex[:8].upper()}'
         now = datetime.utcnow().isoformat()
 
         db.execute("""

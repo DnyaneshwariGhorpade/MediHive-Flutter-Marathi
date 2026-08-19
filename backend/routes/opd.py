@@ -181,11 +181,16 @@ def debug_opd_sheet(opd_id):
     what the sheet row WOULD look like, and the current Google Sheet state.
     Call this after editing an OPD to see if the push data is correct.
     """
-    opd = OPDRecord.get(opd_id)
+    user_id = get_jwt_identity()
+    clinic_id = _get_clinic_id(user_id)
+    if not clinic_id:
+        return jsonify({'error': 'No clinic assigned'}), 403
+
+    opd = OPDRecord.get(opd_id, clinic_id=clinic_id)
     if opd is None:
         return jsonify({'error': 'OPD not found in PostgreSQL'}), 404
 
-    patient = Patient.get(opd['patient_id'])
+    patient = Patient.get(opd['patient_id'], clinic_id=clinic_id)
 
     # Build the sheet row as it would be written
     sheet_row_data = build_sheet_row_data(opd, patient or {}, [])

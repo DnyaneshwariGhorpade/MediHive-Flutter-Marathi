@@ -24,7 +24,8 @@ import 'services/sync_manager.dart';
 import 'services/cloud_sync_manager.dart';
 import 'services/local_notification_service.dart';
 import 'services/notification_service.dart';
-import 'services/firebase_messaging_service.dart';
+
+
 import 'services/background_backup_handler.dart';
 import 'services/data_migration_service.dart';
 import 'database/database_helper.dart';
@@ -35,7 +36,7 @@ import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/registration_screen.dart';
 import 'screens/auth/two_factor_verify_screen.dart';
-import 'screens/auth/forgot_password_screen.dart';
+
 import 'screens/app_shell.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'package:medihive/screens/opd/opd_registration_screen.dart';
@@ -50,7 +51,7 @@ import 'screens/help/help_center_screen.dart';
 import 'screens/backup/backup_screen.dart';
 import 'screens/auth_settings/auth_settings_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
-import 'screens/chatbot/chatbot_screen.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -123,13 +124,6 @@ void main() async {
     } catch (e) {
       debugPrint('main: Workmanager init failed: $e');
     }
-  }
-
-  // Initialize Firebase Cloud Messaging (native only)
-  if (!kIsWeb) {
-    try {
-      await FirebaseMessagingService().init();
-    } catch (_) {}
   }
 
   // Initialize Hive
@@ -333,12 +327,6 @@ final _router = GoRouter(
       builder: (context, state) => const LoginScreen(),
     ),
 
-    // Forgot Password → /forgot-password
-    GoRoute(
-      path: '/forgot-password',
-      builder: (context, state) => const ForgotPasswordScreen(),
-    ),
-
     // 2FA Verification → /2fa-verify
     GoRoute(
       path: '/2fa-verify',
@@ -363,13 +351,7 @@ final _router = GoRouter(
             GoRoute(
               path: '/app',
               builder: (context, state) => const DashboardScreen(),
-              routes: [
-                // Chatbot (from dashboard AI button)
-                GoRoute(
-                  path: 'chatbot',
-                  builder: (context, state) => const ChatbotScreen(),
-                ),
-              ],
+              routes: [],
             ),
           ],
         ),

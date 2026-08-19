@@ -13,7 +13,6 @@ from routes.appointments import appointments_bp
 from routes.sync import sync_bp
 from routes.cloud import cloud_bp
 from routes.settings import settings_bp
-from routes.fcm import fcm_bp
 from routes.whatsapp import whatsapp_bp
 
 logger = get_logger(__name__)
@@ -21,7 +20,10 @@ logger = get_logger(__name__)
 
 def create_app():
     app = Flask(__name__)
-    CORS(app)
+
+    _allowed_origins = os.environ.get('CORS_ORIGINS', '').split(',')
+    _allowed_origins = [o.strip() for o in _allowed_origins if o.strip()]
+    CORS(app, origins=_allowed_origins if _allowed_origins else ['https://medihive-flutter-marathi-production.up.railway.app'])
 
     app.config['SECRET_KEY'] = SECRET_KEY
     app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
@@ -36,12 +38,11 @@ def create_app():
     app.register_blueprint(sync_bp, url_prefix='/api/sync')
     app.register_blueprint(cloud_bp, url_prefix='/api/cloud')
     app.register_blueprint(settings_bp, url_prefix='/api/settings')
-    app.register_blueprint(fcm_bp, url_prefix='/api/fcm')
     app.register_blueprint(whatsapp_bp, url_prefix='/api/whatsapp')
 
     @app.route('/api/health', methods=['GET'])
     def health():
-        return {'status': 'ok', 'version': '1.0.0'}
+        return {'status': 'ok', 'version': '1.0.8'}
 
     @app.route('/', methods=['GET'])
     def root():

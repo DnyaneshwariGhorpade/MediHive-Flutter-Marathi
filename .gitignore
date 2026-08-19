@@ -52,6 +52,14 @@ credentials/
 drive_token.json
 drive_token.json.bak
 oauth_credentials.json
+tok.txt
+body.json
+
+# Debug / test dump files
+login_body.txt
+me_body.txt
+dl_body.txt
+dl2.txt
 
 # Backend database and local images
 backend/medihive.db
@@ -59,3 +67,10 @@ storage/
 
 # Persisted Google Sheet ID (auto-generated on first sync)
 sheet_id.json
+
+# Release signing
+android/app/upload-keystore.jks
+android/key.properties
+
+# Legacy / duplicate project
+medihive_mobile/

@@ -8,7 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class ApiService {
 static String get baseUrl =>
     dotenv.env['API_BASE_URL'] ??
-    'http://192.168.31.91:5000/api';
+    (() { throw StateError('API_BASE_URL not set — check assets/.env'); })();
   static String get cloudBaseUrl =>
       dotenv.env['CLOUD_BASE_URL'] ?? '';
   static String? _token;

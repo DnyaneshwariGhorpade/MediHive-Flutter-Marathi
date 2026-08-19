@@ -385,17 +385,6 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                 ),
                 const Spacer(),
-                GestureDetector(
-                  onTap: () => context.push('/forgot-password'),
-                  child: Text(
-                    AppLocalizations.of(context)!.forgotPassword,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                ),
               ],
             )),
             if (auth.loginError.isNotEmpty)

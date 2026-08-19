@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'api_service.dart';
 import 'connectivity_service.dart';
-import 'firebase_messaging_service.dart';
 import 'sync_refresh_bus.dart';
 import '../utils/sync_id_generator.dart';
 import '../models/appointment_model.dart';
@@ -90,32 +89,18 @@ class SyncManager extends ChangeNotifier {
   Future<void> _registerDevice() async {
     if (_deviceId == null) return;
     try {
-      final fcmToken = FirebaseMessagingService().fcmToken;
       await ApiService.cloudRegisterDevice(
         deviceId: _deviceId!,
         deviceName: _getDeviceName(),
         clinicId: await _loadClinicId(),
         appVersion: '1.0.0',
-        fcmToken: fcmToken,
+        fcmToken: null,
       );
     } catch (_) {}
   }
 
-  /// Re-registers this device when a fresh FCM token arrives so the backend
-  /// always holds a valid token to send silent `sync_trigger` pushes to.
-  Future<void> registerDeviceWithToken(String fcmToken) async {
-    if (kIsWeb) return;
-    if (_deviceId == null) return;
-    try {
-      await ApiService.cloudRegisterDevice(
-        deviceId: _deviceId!,
-        deviceName: _getDeviceName(),
-        clinicId: await _loadClinicId(),
-        appVersion: '1.0.0',
-        fcmToken: fcmToken,
-      );
-    } catch (_) {}
-  }
+  // FCM removed — keep method stub so callers don't break.
+  Future<void> registerDeviceWithToken(String fcmToken) async {}
 
   Future<String> _loadClinicId() async {
     try {

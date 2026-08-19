@@ -6,8 +6,20 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 IS_CLOUD = os.environ.get('MEDIHIVE_CLOUD', '').lower() in ('1', 'true', 'yes')
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'medihive-secret-key-change-in-production')
-JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'medihive-jwt-secret-change-in-production')
+_DEFAULT_SECRET = 'medihive-secret-key-change-in-production'
+_jwt_default = 'medihive-jwt-secret-change-in-production'
+
+SECRET_KEY = os.environ.get('SECRET_KEY', '')
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', '')
+
+if SECRET_KEY in ('', _DEFAULT_SECRET) or JWT_SECRET_KEY in ('', _jwt_default):
+    import sys
+    print(
+        'FATAL: SECRET_KEY and JWT_SECRET_KEY must be set to strong random values.\n'
+        'Set them in Railway env vars (or .env) and restart.',
+        file=sys.stderr,
+    )
+    sys.exit(1)
 JWT_ACCESS_TOKEN_EXPIRES = 86400  # 24 hours
 
 # PostgreSQL connection (Neon PostgreSQL on Cloud Run)
