@@ -72,7 +72,7 @@ class SyncWorkerThread(threading.Thread):
                 "SELECT pg_try_advisory_lock(12345)"
             ).fetchone()
             db.close()
-            if not lock_acquired or not lock_acquired[0]:
+            if not lock_acquired or not lock_acquired.get('pg_try_advisory_lock'):
                 logger.info("Sync worker: another worker holds the advisory lock, skipping.")
                 return
             logger.info("Sync worker: acquired advisory lock, starting poll loop.")
@@ -95,9 +95,15 @@ class SyncWorkerThread(threading.Thread):
         logger.info("Sync background worker thread stopped.")
 
     def reap_stale_processing_events(self):
-        """Reset events stuck in 'processing' for >5 minutes back to 'pending'."""
+        """Reset events stuck in 'processing' for >5 minutes back to 'pending'.
+
+        Also recovers permanently-failed events whose last_error indicates an
+        expired/revoked Google OAuth token (invalid_grant) so they self-heal
+        once the token is refreshed and redeployed.
+        """
         try:
             db = get_db()
+            # 1. Reset stale 'processing' claims (>5 min)
             result = db.execute("""
                 UPDATE sync_queue
                 SET status = 'pending',
@@ -110,6 +116,22 @@ class SyncWorkerThread(threading.Thread):
             if result and result.rowcount > 0:
                 db.commit()
                 logger.warning("Reaper: reset %d stale 'processing' events back to 'pending'", result.rowcount)
+
+            # 2. Re-queue 'failed' events caused by an expired Drive OAuth token
+            #    so they self-heal after the user refreshes DRIVE_TOKEN_JSON.
+            result2 = db.execute("""
+                UPDATE sync_queue
+                SET status = 'pending',
+                    retry_count = 0,
+                    last_error = 'recovered: expired Drive OAuth token, retrying after token refresh'
+                WHERE status = 'failed'
+                  AND retry_count >= 5
+                  AND last_error ILIKE '%invalid_grant%'
+            """)
+            if result2 and result2.rowcount > 0:
+                db.commit()
+                logger.warning("Reaper: recovered %d 'failed' events with expired Drive token back to 'pending'", result2.rowcount)
+
             db.close()
         except Exception as e:
             logger.error("Reaper error: %s", e)
