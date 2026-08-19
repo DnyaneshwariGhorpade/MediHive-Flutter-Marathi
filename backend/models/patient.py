@@ -44,11 +44,26 @@ class Patient:
                                       address, created_at, updated_at, weight,
                                       user_id, clinic_id, device_id, sync_status, last_synced_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    full_name = COALESCE(NULLIF(EXCLUDED.full_name, ''), patients.full_name),
+                    dob = COALESCE(NULLIF(EXCLUDED.dob, ''), patients.dob),
+                    age = COALESCE(EXCLUDED.age, patients.age),
+                    gender = COALESCE(NULLIF(EXCLUDED.gender, ''), patients.gender),
+                    blood_group = COALESCE(NULLIF(EXCLUDED.blood_group, ''), patients.blood_group),
+                    mobile_number = COALESCE(NULLIF(EXCLUDED.mobile_number, ''), patients.mobile_number),
+                    alternate_mobile = COALESCE(NULLIF(EXCLUDED.alternate_mobile, ''), patients.alternate_mobile),
+                    address = COALESCE(NULLIF(EXCLUDED.address, ''), patients.address),
+                    weight = COALESCE(EXCLUDED.weight, patients.weight),
+                    clinic_id = COALESCE(NULLIF(EXCLUDED.clinic_id, ''), patients.clinic_id),
+                    device_id = COALESCE(NULLIF(EXCLUDED.device_id, ''), patients.device_id),
+                    sync_status = EXCLUDED.sync_status,
+                    last_synced_at = EXCLUDED.last_synced_at,
+                    updated_at = EXCLUDED.updated_at
             """, (
-                data['id'], data['full_name'], data.get('dob', ''),
+                data['id'], data.get('full_name') or data.get('name', ''), data.get('dob', ''),
                 data.get('age', 0), data.get('gender', 'Not Specified'),
                 data.get('blood_group', 'Not Specified'),
-                data.get('mobile_number', ''), data.get('alternate_mobile', ''),
+                data.get('mobile_number') or data.get('mobile', ''), data.get('alternate_mobile', ''),
                 data.get('address', ''), now, now, data.get('weight'),
                 data.get('user_id', ''),
                 data.get('clinic_id', ''),

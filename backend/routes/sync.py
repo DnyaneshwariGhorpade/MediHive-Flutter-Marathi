@@ -398,20 +398,20 @@ def sync_upload():
             p['id'] = Patient.assign_next_id(clinic_id=clinic_id)
             temp_id_map[old_id] = p['id']
 
-        existing = Patient.get(p['id'], clinic_id=clinic_id)
+        existing = Patient.get(p['id'], clinic_id=clinic_id) or Patient.get(p['id'])
         if existing:
             remote_updated = p.get('updated_at', '')
             local_updated = existing.get('updated_at', '')
             if _remote_newer_or_equal(remote_updated, local_updated):
                 Patient.update(p['id'], p, clinic_id=clinic_id)
-                results['patients'].append(_format_patient(Patient.get(p['id'], clinic_id=clinic_id)))
+                results['patients'].append(_format_patient(Patient.get(p['id'])))
                 events_to_enqueue.append(('patient', p['id'], 'upsert'))
             else:
                 results['patients'].append(_format_patient(existing))
                 conflicts.append(f"Patient {p['id']} update skipped: local record is newer (local={local_updated}, remote={remote_updated})")
         else:
             Patient.create(p)
-            results['patients'].append(_format_patient(Patient.get(p['id'], clinic_id=clinic_id)))
+            results['patients'].append(_format_patient(Patient.get(p['id'])))
             events_to_enqueue.append(('patient', p['id'], 'upsert'))
 
     # ── OPD Records (last-write-wins) ──
@@ -439,20 +439,20 @@ def sync_upload():
         if pat_id in temp_id_map:
             r['patient_id'] = temp_id_map[pat_id]
 
-        existing = OPDRecord.get(r['id'], clinic_id=clinic_id)
+        existing = OPDRecord.get(r['id'], clinic_id=clinic_id) or OPDRecord.get(r['id'])
         if existing:
             remote_updated = r.get('updated_at', '')
             local_updated = existing.get('updated_at', '')
             if _remote_newer_or_equal(remote_updated, local_updated):
                 OPDRecord.update(r['id'], r, clinic_id=clinic_id)
-                result = OPDRecord.get(r['id'], clinic_id=clinic_id)
+                result = OPDRecord.get(r['id'])
                 events_to_enqueue.append(('opd_visit', r['id'], 'upsert'))
             else:
                 result = existing
                 conflicts.append(f"OPD Visit {r['id']} update skipped: local record is newer (local={local_updated}, remote={remote_updated})")
         else:
             OPDRecord.create(r)
-            result = OPDRecord.get(r['id'], clinic_id=clinic_id)
+            result = OPDRecord.get(r['id'])
             events_to_enqueue.append(('opd_visit', r['id'], 'upsert'))
 
         results['opd_records'].append(_format_opd(result))
@@ -460,7 +460,7 @@ def sync_upload():
         # Check if referenced patient exists, if not, queue for self-healing
         pat_id = r.get('patient_id', '')
         if pat_id:
-            p_exist = Patient.get(pat_id, clinic_id=clinic_id)
+            p_exist = Patient.get(pat_id, clinic_id=clinic_id) or Patient.get(pat_id)
             if not p_exist and pat_id not in missing_patients:
                 missing_patients.append(pat_id)
 
@@ -471,30 +471,36 @@ def sync_upload():
         a['sync_status'] = 'synced'
         a['last_synced_at'] = now
 
+        # Backward compatibility translation:
+        if 'appointment_date' in a and 'date_time' not in a:
+            a['date_time'] = a['appointment_date']
+        if 'date_time' not in a or not a['date_time']:
+            a['date_time'] = now
+
         pat_id = a.get('patient_id', '')
         if pat_id in temp_id_map:
             a['patient_id'] = temp_id_map[pat_id]
 
-        existing = Appointment.get(a['id'], clinic_id=clinic_id)
+        existing = Appointment.get(a['id'], clinic_id=clinic_id) or Appointment.get(a['id'])
         if existing:
             remote_updated = a.get('updated_at', '')
             local_updated = existing.get('updated_at', '')
             if _remote_newer_or_equal(remote_updated, local_updated):
                 Appointment.update(a['id'], a, clinic_id=clinic_id)
-                results['appointments'].append(Appointment.get(a['id'], clinic_id=clinic_id))
+                results['appointments'].append(Appointment.get(a['id']))
                 events_to_enqueue.append(('appointment', a['id'], 'upsert'))
             else:
                 results['appointments'].append(existing)
                 conflicts.append(f"Appointment {a['id']} update skipped: local record is newer (local={local_updated}, remote={remote_updated})")
         else:
             Appointment.create(a)
-            results['appointments'].append(Appointment.get(a['id'], clinic_id=clinic_id))
+            results['appointments'].append(Appointment.get(a['id']))
             events_to_enqueue.append(('appointment', a['id'], 'upsert'))
 
         # Check if referenced patient exists, if not, queue for self-healing
         pat_id = a.get('patient_id', '')
         if pat_id:
-            p_exist = Patient.get(pat_id, clinic_id=clinic_id)
+            p_exist = Patient.get(pat_id, clinic_id=clinic_id) or Patient.get(pat_id)
             if not p_exist and pat_id not in missing_patients:
                 missing_patients.append(pat_id)
 

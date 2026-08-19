@@ -54,9 +54,19 @@ class Appointment:
                                           created_at, updated_at, user_id, clinic_id,
                                           device_id, sync_status, last_synced_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    patient_id = COALESCE(NULLIF(EXCLUDED.patient_id, ''), appointments.patient_id),
+                    patient_name = COALESCE(NULLIF(EXCLUDED.patient_name, ''), appointments.patient_name),
+                    date_time = COALESCE(NULLIF(EXCLUDED.date_time, ''), appointments.date_time),
+                    notes = COALESCE(NULLIF(EXCLUDED.notes, ''), appointments.notes),
+                    clinic_id = COALESCE(NULLIF(EXCLUDED.clinic_id, ''), appointments.clinic_id),
+                    device_id = COALESCE(NULLIF(EXCLUDED.device_id, ''), appointments.device_id),
+                    sync_status = EXCLUDED.sync_status,
+                    last_synced_at = EXCLUDED.last_synced_at,
+                    updated_at = EXCLUDED.updated_at
             """, (
                 data['id'], data.get('patient_id', ''),
-                data.get('patient_name', ''), data['date_time'],
+                data.get('patient_name', ''), data.get('date_time') or now,
                 data.get('notes', ''), now, now,
                 data.get('user_id', ''),
                 data.get('clinic_id', ''),
