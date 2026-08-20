@@ -694,22 +694,6 @@ def full_restore():
     medicines = _all_master_items('medicines')
     symptoms = _all_master_items('symptoms_master')
 
-    return jsonify({
-        'clinic': clinic,
-        'patients': formatted_patients,
-        'opd_records': formatted_opd,
-        'appointments': appointments,
-        'clinic_settings': [clinic_settings] if clinic_settings else [],
-        'calendar_notes': calendar_notes,
-        'medicines': medicines,
-        'symptoms': symptoms,
-        'deleted_entities': deleted_entities,
-        'server_time': datetime.utcnow().isoformat(),
-    }), 200
-
-
-# ── Mobile Sync: Upload Images ──────────────────────
-
 @sync_bp.route('/upload-images/<opd_id>', methods=['POST'])
 @jwt_required()
 def sync_upload_images(opd_id):
@@ -717,11 +701,6 @@ def sync_upload_images(opd_id):
     clinic_id = _get_user_clinic_id(user_id)
 
     logger.info("=== IMAGE UPLOAD START === OPD=%s clinic=%s", opd_id, clinic_id)
-
-    opd = OPDRecord.get(opd_id, clinic_id=clinic_id) if clinic_id else OPDRecord.get(opd_id)
-    if opd is None:
-        logger.warning("OPD record not found: %s", opd_id)
-        return jsonify({'error': 'OPD record not found'}), 404
 
     if 'images' not in request.files:
         logger.warning("No 'images' field in request for OPD %s", opd_id)
@@ -737,7 +716,7 @@ def sync_upload_images(opd_id):
     drive_urls = []
     direct_upload_success = False
 
-    # 1. Attempt direct upload to Google Drive
+    # 1. Direct upload to Google Drive folder DRIVE_ROOT_FOLDER_ID
     try:
         from drive_utils import upload_image_fileobj_to_drive
         for i, f in enumerate(files, 1):
@@ -752,16 +731,33 @@ def sync_upload_images(opd_id):
         if drive_urls:
             direct_upload_success = True
             urls_text = "\n".join(drive_urls)
-            OPDRecord.set_image_links(opd_id, urls_text, clinic_id=clinic_id)
+            
+            # Ensure OPD record exists or insert stub so links are never lost
+            opd = OPDRecord.get(opd_id, clinic_id=clinic_id) if clinic_id else OPDRecord.get(opd_id)
+            if opd:
+                OPDRecord.set_image_links(opd_id, urls_text, clinic_id=clinic_id)
+            else:
+                now = datetime.utcnow().isoformat()
+                OPDRecord.create({
+                    'id': opd_id,
+                    'opd_id': opd_id,
+                    'patient_id': '',
+                    'clinic_id': clinic_id or '',
+                    'image_links': urls_text,
+                    'created_at': now,
+                    'updated_at': now,
+                })
+            
             logger.info("Direct Drive upload success for OPD %s: %s", opd_id, drive_urls)
 
             # 2. Immediately update Google Sheet with new Image Links
             try:
                 from sheets_utils import upsert_opd_row_in_sheet
-                updated_opd = (OPDRecord.get(opd_id, clinic_id=clinic_id) if clinic_id else OPDRecord.get(opd_id)) or opd
-                pat_id = updated_opd.get('patient_id')
-                patient = (Patient.get(pat_id, clinic_id=clinic_id) if clinic_id else Patient.get(pat_id)) if pat_id else {}
-                row_data = build_sheet_row_data(updated_opd, patient or {}, drive_urls)
+                from routes.opd import build_sheet_row_data
+                updated_opd = (OPDRecord.get(opd_id, clinic_id=clinic_id) if clinic_id else OPDRecord.get(opd_id)) or {}
+                pat_id = updated_opd.get('patient_id') if isinstance(updated_opd, dict) else ''
+                patient = ((Patient.get(pat_id, clinic_id=clinic_id) if clinic_id else Patient.get(pat_id)) if pat_id else {}) or {}
+                row_data = build_sheet_row_data(updated_opd, patient, drive_urls)
                 upsert_opd_row_in_sheet(opd_id, row_data)
                 logger.info("Google Sheet row updated with Drive image links for OPD %s", opd_id)
             except Exception as se:

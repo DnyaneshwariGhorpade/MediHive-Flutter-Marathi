@@ -124,18 +124,18 @@ class SyncManager extends ChangeNotifier {
   }
 
   Future<void> _trySync() async {
-    if (!_connectivity.currentStatus) {
-      debugPrint('SYNC SKIP: no connectivity — probing reachability...');
-      final reachable = await _connectivity.probeReachability();
-      if (!reachable) {
-        debugPrint('SYNC SKIP: reachability probe failed — staying offline');
-        return;
-      }
-      debugPrint('SYNC: reachability probe passed — continuing sync');
-    }
     if (_syncState == SyncState.syncing) {
       debugPrint('SYNC SKIP: already syncing');
       return;
+    }
+
+    // Check connectivity as an advisory check, but don't hard-block user actions
+    if (!_connectivity.currentStatus) {
+      debugPrint('SYNC NOTICE: network check reports offline — verifying reachability...');
+      final reachable = await _connectivity.probeReachability();
+      if (!reachable) {
+        debugPrint('SYNC NOTICE: reachability probe returned false, attempting direct sync anyway...');
+      }
     }
 
     debugPrint('SYNC START: state=$_syncState');

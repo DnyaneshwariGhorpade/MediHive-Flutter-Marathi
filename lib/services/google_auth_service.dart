@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -17,9 +16,10 @@ class GoogleAuthService {
         : null;
     return GoogleSignIn(
       serverClientId: (serverClientId != null && serverClientId.isNotEmpty) ? serverClientId : null,
-      scopes: [
+      scopes: const [
         'email',
-        drive.DriveApi.driveFileScope,
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/drive.file',
       ],
     );
   }
@@ -46,36 +46,35 @@ class GoogleAuthService {
   Stream<GoogleSignInAccount?> get onAuthStateChanged => _authController.stream;
 
   Future<void> init() async {
-    if (kIsWeb) return;
     try {
       await _signIn.signInSilently();
     } catch (e) {
-      debugPrint('Auth init skipped: $e');
+      debugPrint('GoogleAuthService init silent sign-in skipped: $e');
     }
   }
 
-  GoogleSignInAccount? get currentUser =>
-      kIsWeb ? null : _signIn.currentUser;
+  GoogleSignInAccount? get currentUser => _signIn.currentUser;
 
   Future<GoogleSignInAccount?> signInWithGoogle() async {
-    if (kIsWeb) return null;
     try {
       GoogleSignInAccount? account;
       try {
+        debugPrint('GoogleAuthService: Attempting Google sign-in with serverClientId...');
         account = await _signIn.signIn();
       } catch (firstError) {
-        debugPrint('Initial signInWithGoogle failed ($firstError), retrying with native Android client...');
+        debugPrint('GoogleAuthService: Primary sign-in error ($firstError), retrying with basic client...');
         try {
           final fallbackSignIn = _buildGoogleSignIn(useServerClientId: false);
           _googleSignIn = fallbackSignIn;
           account = await fallbackSignIn.signIn();
         } catch (secondError) {
-          debugPrint('Fallback signInWithGoogle failed ($secondError)');
+          debugPrint('GoogleAuthService: Fallback sign-in error ($secondError)');
           throw firstError;
         }
       }
 
       if (account != null) {
+        debugPrint('GoogleAuthService: Sign-in successful for ${account.email}');
         final auth = await account.authentication;
         if (auth.accessToken != null) {
           await _secureStorage.write(key: _keyAccessToken, value: auth.accessToken);
@@ -83,6 +82,8 @@ class GoogleAuthService {
         if (auth.idToken != null) {
           await _secureStorage.write(key: _keyIdToken, value: auth.idToken);
         }
+      } else {
+        debugPrint('GoogleAuthService: Sign-in cancelled by user.');
       }
       _authController.add(account);
       return account;
@@ -94,8 +95,9 @@ class GoogleAuthService {
   }
 
   Future<void> signOut() async {
-    if (kIsWeb) return;
-    await _signIn.signOut();
+    try {
+      await _signIn.signOut();
+    } catch (_) {}
     await _secureStorage.delete(key: _keyAccessToken);
     await _secureStorage.delete(key: _keyIdToken);
     _authController.add(null);
