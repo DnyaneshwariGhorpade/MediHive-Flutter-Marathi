@@ -59,13 +59,16 @@ class GoogleAuthService:
                 scopes=token_data.get("scopes"),
             )
 
-            if creds.expired and creds.refresh_token:
+            if (not creds.valid or creds.expired) and creds.refresh_token:
                 creds.refresh(Request())
-                self._persist_token(creds)
+                try:
+                    self._persist_token(creds)
+                except Exception:
+                    pass
 
             self._creds = creds
             return creds
-        except Exception:
+        except Exception as e:
             return None
 
     def get_authorization_url(self, redirect_port: int = 8090) -> str:
