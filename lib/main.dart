@@ -27,6 +27,7 @@ import 'services/notification_service.dart';
 
 
 import 'services/background_backup_handler.dart';
+import 'services/daily_summary_service.dart';
 import 'services/data_migration_service.dart';
 import 'database/database_helper.dart';
 
@@ -200,6 +201,7 @@ void main() async {
 
     try {
       await scheduleMorningSummaryTask();
+      await DailySummaryService.scheduleDaily8AmNotification();
     } catch (e) {
       debugPrint('main: scheduleMorningSummaryTask failed: $e');
     }

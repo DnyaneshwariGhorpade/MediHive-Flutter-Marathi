@@ -9,16 +9,23 @@ class GoogleAuthService {
   GoogleSignIn? _googleSignIn;
 
   static const String _defaultServerClientId =
-      '290270748160-cp445caqpj3aab8p48v48ql8meuqah7d.apps.googleusercontent.com';
+      '644148878993-5hagauhlr9lsi9isv17um1kek0utbo53.apps.googleusercontent.com';
 
-  GoogleSignIn get _signIn {
-    final serverClientId = dotenv.env['GOOGLE_SERVER_CLIENT_ID'] ?? _defaultServerClientId;
-    _googleSignIn ??= GoogleSignIn(
-      serverClientId: serverClientId.isNotEmpty ? serverClientId : null,
+  GoogleSignIn _buildGoogleSignIn({bool useServerClientId = true}) {
+    final serverClientId = useServerClientId
+        ? (dotenv.env['GOOGLE_SERVER_CLIENT_ID'] ?? _defaultServerClientId)
+        : null;
+    return GoogleSignIn(
+      serverClientId: (serverClientId != null && serverClientId.isNotEmpty) ? serverClientId : null,
       scopes: [
+        'email',
         drive.DriveApi.driveFileScope,
       ],
     );
+  }
+
+  GoogleSignIn get _signIn {
+    _googleSignIn ??= _buildGoogleSignIn(useServerClientId: true);
     return _googleSignIn!;
   }
 
@@ -53,7 +60,21 @@ class GoogleAuthService {
   Future<GoogleSignInAccount?> signInWithGoogle() async {
     if (kIsWeb) return null;
     try {
-      final account = await _signIn.signIn();
+      GoogleSignInAccount? account;
+      try {
+        account = await _signIn.signIn();
+      } catch (firstError) {
+        debugPrint('Initial signInWithGoogle failed ($firstError), retrying with native Android client...');
+        try {
+          final fallbackSignIn = _buildGoogleSignIn(useServerClientId: false);
+          _googleSignIn = fallbackSignIn;
+          account = await fallbackSignIn.signIn();
+        } catch (secondError) {
+          debugPrint('Fallback signInWithGoogle failed ($secondError)');
+          throw firstError;
+        }
+      }
+
       if (account != null) {
         final auth = await account.authentication;
         if (auth.accessToken != null) {

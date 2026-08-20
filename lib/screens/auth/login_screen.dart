@@ -450,11 +450,13 @@ class _LoginScreenState extends State<LoginScreen>
                             context.go('/app');
                           }
                         } else if (!success && mounted) {
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(
+                          final msg = auth.loginError.isNotEmpty
+                              ? auth.loginError
+                              : AppLocalizations.of(context)!.googleSignInFailed;
+                          ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content:
-                                  Text(AppLocalizations.of(context)!.googleSignInFailed),
+                              content: Text(msg),
+                              backgroundColor: AppTheme.danger,
                             ),
                           );
                         }

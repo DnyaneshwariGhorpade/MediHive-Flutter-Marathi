@@ -47,11 +47,14 @@ class OPDRecord:
         with get_db() as db:
             if clinic_id:
                 row = db.execute(
-                    "SELECT * FROM opd_visits WHERE id = %s AND clinic_id = %s",
-                    (record_id, clinic_id)
+                    "SELECT * FROM opd_visits WHERE (id = %s OR opd_id = %s) AND clinic_id = %s",
+                    (record_id, record_id, clinic_id)
                 ).fetchone()
             else:
-                row = db.execute("SELECT * FROM opd_visits WHERE id = %s", (record_id,)).fetchone()
+                row = db.execute(
+                    "SELECT * FROM opd_visits WHERE id = %s OR opd_id = %s",
+                    (record_id, record_id)
+                ).fetchone()
         return OPDRecord.dict_from_row(row)
 
     @staticmethod
@@ -175,13 +178,13 @@ class OPDRecord:
         with get_db() as db:
             if clinic_id:
                 db.execute(
-                    "UPDATE opd_visits SET image_links = %s, updated_at = %s WHERE id = %s AND clinic_id = %s",
-                    (links_text, now, record_id, clinic_id)
+                    "UPDATE opd_visits SET image_links = %s, updated_at = %s WHERE (id = %s OR opd_id = %s) AND clinic_id = %s",
+                    (links_text, now, record_id, record_id, clinic_id)
                 )
             else:
                 db.execute(
-                    "UPDATE opd_visits SET image_links = %s, updated_at = %s WHERE id = %s",
-                    (links_text, now, record_id)
+                    "UPDATE opd_visits SET image_links = %s, updated_at = %s WHERE id = %s OR opd_id = %s",
+                    (links_text, now, record_id, record_id)
                 )
             db.commit()
 

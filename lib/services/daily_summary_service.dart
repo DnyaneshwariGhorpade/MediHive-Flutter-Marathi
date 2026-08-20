@@ -89,43 +89,64 @@ class DailySummaryService {
     final repo = OpdRecordRepository();
 
     int followUpCount = 0;
-    int panchakarmaCount = 0;
-    int pendingPaymentCount = 0;
     try {
       followUpCount = await repo.countTodayFollowUps();
     } catch (_) {}
-    try {
-      panchakarmaCount = await repo.countTodayPanchakarmaSessions();
-    } catch (_) {}
-    try {
-      pendingPaymentCount = await repo.countPendingPayments();
-    } catch (_) {}
 
-    const title = 'Good Morning, Doctor! \u{1F305}';
+    const title = 'Good Morning Doctor! \u{1F305}';
+    final body = followUpCount > 0
+        ? "Good morning doctor, today's follow-up: $followUpCount. Enjoy your day!"
+        : "Good morning doctor, no follow-ups scheduled for today. Enjoy your day!";
 
-    if (followUpCount > 0 || panchakarmaCount > 0 || pendingPaymentCount > 0) {
-      final parts = <String>[];
-      if (followUpCount > 0) {
-        parts.add('$followUpCount follow-up${followUpCount == 1 ? '' : 's'}');
-      }
-      if (panchakarmaCount > 0) {
-        parts.add('$panchakarmaCount Panchakarma session${panchakarmaCount == 1 ? '' : 's'}');
-      }
-      if (pendingPaymentCount > 0) {
-        parts.add('$pendingPaymentCount pending payment${pendingPaymentCount == 1 ? '' : 's'}');
-      }
-      final body = 'You have ${parts.join(', ')} today. Tap to view today\'s schedule.';
-      await local_notif.LocalNotificationService().showNotification(
-        id: _morningSummaryId,
-        title: title,
-        body: body,
+    await local_notif.LocalNotificationService().showNotification(
+      id: _morningSummaryId,
+      title: title,
+      body: body,
+    );
+  }
+
+  /// Schedule recurring 8:00 AM daily exact notification directly on device
+  static Future<void> scheduleDaily8AmNotification() async {
+    if (kIsWeb) return;
+    try {
+      tz_data.initializeTimeZones();
+      final now = tz.TZDateTime.now(tz.local);
+      var scheduledDate = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day,
+        8,
+        0,
       );
-    } else {
-      await local_notif.LocalNotificationService().showNotification(
-        id: _morningSummaryId,
-        title: title,
-        body: 'No follow-ups are scheduled for today. Have a productive day!',
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+
+      await sharedNotificationPlugin.zonedSchedule(
+        _morningSummaryId,
+        'Good Morning Doctor! \u{1F305}',
+        'Tap to view today\'s follow-up schedule and clinic updates.',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'daily_summary',
+            'Daily Summary',
+            channelDescription: 'Daily 8 AM follow-up and appointment summary',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
       );
+      debugPrint('Daily 8 AM morning notification scheduled successfully.');
+    } catch (e) {
+      debugPrint('Failed to schedule daily 8 AM notification: $e');
     }
   }
 

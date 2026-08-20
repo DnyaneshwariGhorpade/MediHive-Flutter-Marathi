@@ -120,8 +120,8 @@ class AuthService {
       );
     } catch (e) {
       debugPrint('AuthService.signInWithGoogle error: $e');
+      rethrow;
     }
-    return null;
   }
 
   Future<AppUser?> signInSilently() async {

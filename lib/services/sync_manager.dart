@@ -20,6 +20,9 @@ import '../repositories/calendar_notes_repository.dart';
 import '../repositories/medicines_repository.dart';
 import '../repositories/symptoms_master_repository.dart';
 import '../database/database_helper.dart';
+import 'event_notification_service.dart';
+import 'local_notification_service.dart';
+import '../providers/notification_provider.dart';
 import 'dart:math' show Random;
 
 enum SyncState {
@@ -440,6 +443,17 @@ class SyncManager extends ChangeNotifier {
             await _opdRepo.update(localId, row);
           } else {
             await _opdRepo.insert(row);
+            // Cross-device alert for new OPD registration
+            try {
+              final patientSyncId = map['patient_id']?.toString() ?? '';
+              final patient = await _patientRepo.getBySyncId(patientSyncId);
+              final patientName = patient?['full_name'] as String? ?? 'Patient';
+              final opdType = map['opd_type']?.toString() ?? 'OPD';
+              await EventNotificationService.notifyOpdRegistered(
+                patientName: patientName,
+                type: opdType,
+              );
+            } catch (_) {}
           }
           applied++;
         }
@@ -887,6 +901,17 @@ class SyncManager extends ChangeNotifier {
             }
           }
           applied++;
+          // Cross-device alert for new or updated clinic note
+          try {
+            const notifTitle = 'Clinic Note Updated';
+            final notifBody = 'Clinic note for $date was updated on another device.';
+            await NotificationProvider.addNotificationSilently(notifTitle, notifBody);
+            await LocalNotificationService().showNotification(
+              id: date.hashCode & 0x7FFFFFFF,
+              title: notifTitle,
+              body: notifBody,
+            );
+          } catch (_) {}
         }
       } catch (_) {}
     }
