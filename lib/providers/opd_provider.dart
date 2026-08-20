@@ -752,6 +752,11 @@ class OpdProvider extends ChangeNotifier {
           debugPrint('WARN: Failed to save document for record $opdId: $e');
           debugPrint(st.toString());
         }
+        // Push the pending image to Google Drive / Google Sheets right away
+        Future.microtask(() {
+          debugPrint('FORCING IMMEDIATE SYNC (pending OPD image)');
+          SyncManager().forceSyncNow();
+        });
       }
 
       // 2. Create calendar appointment for future follow-up (nextVisit)

@@ -137,7 +137,7 @@ def build_sheet_row_data(opd, patient, drive_urls):
     if not drive_urls:
         existing_links = opd.get('image_links', '') or ''
         if existing_links:
-            drive_urls = existing_links.split('\n')
+            drive_urls = [u.strip() for u in existing_links.split('\n') if u.strip()]
             logger.info("SHEET PRESERVED image_links for OPD %s: %s", opd.get('id') or opd.get('opd_id'), drive_urls)
 
     return {

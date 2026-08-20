@@ -165,8 +165,12 @@ def upload_images_to_drive(opd_id, image_records, visit_date):
 
 
 def upload_image_fileobj_to_drive(opd_id, file_storage, index):
-    logger.info("DRIVE_UPLOAD_FILEOBJ: START: OPD=%s index=%d filename=%s content_type=%s",
-                opd_id, index, file_storage.filename, file_storage.content_type)
+    logger.info("DRIVE_UPLOAD_FILEOBJ: START: OPD=%s index=%d filename=%s content_type=%s destination_folder=%s",
+                opd_id, index, file_storage.filename, file_storage.content_type,
+                DRIVE_ROOT_FOLDER_ID or '(not configured)')
+
+    if not DRIVE_ROOT_FOLDER_ID:
+        raise ValueError("DRIVE_ROOT_FOLDER_ID is empty — cannot upload to Drive")
 
     content = file_storage.read()
     content_len = len(content)
@@ -179,6 +183,8 @@ def upload_image_fileobj_to_drive(opd_id, file_storage, index):
 
     file_io = io.BytesIO(content)
 
+    # Token refresh is handled inside GoogleAuthService.get_credentials()
+    # (used by get_drive_service) whenever the OAuth access token has expired.
     service = get_drive_service()
     filename = file_storage.filename or f"image_{index}.jpg"
     safe_name = f"{opd_id}_{index:02d}_{filename}"

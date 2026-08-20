@@ -264,7 +264,19 @@ class SyncWorkerThread(threading.Thread):
                     opd = OPDRecord.get(entity_id, clinic_id=clinic_id)
                     if opd:
                         patient = Patient.get(opd.get('patient_id'), clinic_id=clinic_id) or {}
-                        row_data = build_sheet_row_data(opd, patient, drive_urls)
+                        # If images were uploaded via /sync/upload-images, the
+                        # Drive URLs are persisted in opd_visits.image_links.
+                        # Always prefer the DB links (or freshly generated
+                        # drive_urls) so the "Image Links" column (AA) is never
+                        # overwritten with empty values.
+                        db_image_links = (opd.get('image_links') or '').strip()
+                        if db_image_links:
+                            sheet_drive_urls = [
+                                u.strip() for u in db_image_links.split('\n') if u.strip()
+                            ]
+                        else:
+                            sheet_drive_urls = list(drive_urls)
+                        row_data = build_sheet_row_data(opd, patient, sheet_drive_urls)
                         upsert_opd_row_in_sheet(entity_id, row_data)
                         state["sheets_update"] = "success"
                     else:

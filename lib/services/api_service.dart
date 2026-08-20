@@ -470,25 +470,18 @@ static String get baseUrl =>
     }
   }
 
-  static Future<Map<String, dynamic>> cloudUploadImages(
+  static Future<Map<String, dynamic>> _sendImageUploadRequest(
     String opdId,
-    List<File> images,
+    List<http.MultipartFile> files,
   ) async {
-    await _loadToken();
     final uri = Uri.parse('$baseUrl/sync/upload-images/$opdId');
     final request = http.MultipartRequest('POST', uri);
     request.headers['Authorization'] = 'Bearer $_token';
 
     debugPrint('CLOUD IMAGE DEBUG: endpoint=$uri');
-    debugPrint('CLOUD IMAGE DEBUG: file count=${images.length}');
+    debugPrint('CLOUD IMAGE DEBUG: file count=${files.length}');
 
-    for (final image in images) {
-      final exists = image.existsSync();
-      debugPrint('CLOUD IMAGE DEBUG: file exists=$exists path=${image.path}');
-      request.files.add(
-        await http.MultipartFile.fromPath('images', image.path),
-      );
-    }
+    request.files.addAll(files);
 
     debugPrint('CLOUD IMAGE DEBUG: request.files count=${request.files.length}');
     debugPrint('CLOUD IMAGE DEBUG: sending request...');
@@ -508,6 +501,36 @@ static String get baseUrl =>
       response.statusCode,
       jsonDecode(response.body)['error']?.toString() ?? 'Image upload failed',
     );
+  }
+
+  static Future<Map<String, dynamic>> cloudUploadImages(
+    String opdId,
+    List<File> images,
+  ) async {
+    await _loadToken();
+    final files = <http.MultipartFile>[];
+    for (final image in images) {
+      final exists = image.existsSync();
+      debugPrint('CLOUD IMAGE DEBUG: file exists=$exists path=${image.path}');
+      files.add(await http.MultipartFile.fromPath('images', image.path));
+    }
+    return _sendImageUploadRequest(opdId, files);
+  }
+
+  /// Uploads image bytes directly via multipart. Works on every platform
+  /// (Web, Android, iOS, Windows) since no temp files are involved.
+  static Future<Map<String, dynamic>> cloudUploadImagesBytes(
+    String opdId,
+    List<Uint8List> images,
+  ) async {
+    await _loadToken();
+    final files = <http.MultipartFile>[];
+    for (var i = 0; i < images.length; i++) {
+      final bytes = images[i];
+      debugPrint('CLOUD IMAGE DEBUG: adding bytes[$i] size=${bytes.length}');
+      files.add(http.MultipartFile.fromBytes('images', bytes, filename: 'image_${i + 1}.jpg'));
+    }
+    return _sendImageUploadRequest(opdId, files);
   }
 
   static Future<void> updateFcmToken(String token) async {

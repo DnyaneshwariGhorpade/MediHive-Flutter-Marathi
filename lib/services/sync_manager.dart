@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -66,21 +65,22 @@ class SyncManager extends ChangeNotifier {
   static final SyncManager _instance = SyncManager._internal();
   factory SyncManager() => _instance;
   SyncManager._internal() {
-    if (kIsWeb) return;
     _init();
   }
 
   Future<void> _init() async {
     _deviceId = await _loadOrCreateDeviceId();
-    _connectivitySubscription = _connectivity.isConnected.listen((connected) {
-      if (!connected) {
-        _syncState = SyncState.offline;
-        notifyListeners();
-      } else {
-        _debounceTimer?.cancel();
-        _debounceTimer = Timer(const Duration(seconds: 3), _trySync);
-      }
-    });
+    try {
+      _connectivitySubscription = _connectivity.isConnected.listen((connected) {
+        if (!connected) {
+          _syncState = SyncState.offline;
+          notifyListeners();
+        } else {
+          _debounceTimer?.cancel();
+          _debounceTimer = Timer(const Duration(seconds: 3), _trySync);
+        }
+      });
+    } catch (_) {}
     _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       SyncRefreshBus().notifyDataChanged();
       _trySync();
@@ -115,7 +115,6 @@ class SyncManager extends ChangeNotifier {
   }
 
   Future<void> _trySync() async {
-    if (kIsWeb) return;
     if (!_connectivity.currentStatus) {
       debugPrint('SYNC SKIP: no connectivity');
       return;
@@ -359,18 +358,18 @@ class SyncManager extends ChangeNotifier {
         final raw = docBox.get(opdId);
         if (raw == null) continue;
 
-        final bytes = base64Decode(raw.toString());
-        final tempFile = File('${Directory.systemTemp.path}/${opdId}_${DateTime.now().microsecondsSinceEpoch}.jpg');
         try {
-          await tempFile.writeAsBytes(bytes);
-          final response = await ApiService.cloudUploadImages(opdId, [tempFile]);
+          // Decode in-memory bytes and upload directly — works on Web,
+          // Android, iOS and Windows without touching the filesystem.
+          final bytes = base64Decode(raw.toString());
+          final response = await ApiService.cloudUploadImagesBytes(opdId, [bytes]);
           final urls = (response['drive_urls'] as List<dynamic>?)?.map((u) => u.toString()).toList() ?? [];
           if (urls.isNotEmpty) {
             final opdRow = await _opdRepo.getByOpdId(opdId);
             final localOpdId = opdRow?['id'] as int? ?? 0;
             final localPatientId = opdRow?['patient_id'] as int? ?? 0;
-            for (final u in urls) {
-              final normUrl = _normalizeDriveUrl(u);
+            final normUrls = urls.map(_normalizeDriveUrl).toList();
+            for (final u in normUrls) {
               final maxImgId = await _imagesRepo.getMaxId();
               await _imagesRepo.insert({
                 'id': maxImgId + 1,
@@ -381,15 +380,18 @@ class SyncManager extends ChangeNotifier {
                 'sync_status': 'synced',
                 'uploaded_at': DateTime.now().toIso8601String(),
                 'created_at': DateTime.now().toIso8601String(),
-                'drive_url': normUrl,
+                'drive_url': u,
               });
+            }
+            // Mirror the Drive URLs back into the local OPD record so the
+            // patient card/details can render the attachments immediately.
+            if (localOpdId > 0) {
+              await _opdRepo.update(localOpdId, {'image_links': normUrls.join('\n')});
             }
           }
           await docBox.delete(opdId);
         } catch (e) {
           debugPrint('SYNC image upload failed for $opdId: $e');
-        } finally {
-          if (await tempFile.exists()) await tempFile.delete();
         }
       }
     } catch (e) {
@@ -782,6 +784,7 @@ class SyncManager extends ChangeNotifier {
       'created_at': remote['created_at']?.toString() ?? DateTime.now().toIso8601String(),
       'updated_at': _asUtcIso(remote['updated_at']?.toString() ?? ''),
       'medicines': remote['medicines']?.toString() ?? '',
+      'image_links': remote['image_links']?.toString() ?? '',
     };
   }
 
@@ -822,11 +825,16 @@ class SyncManager extends ChangeNotifier {
   }
 
   Future<String> _loadOrCreateDeviceId() async {
-    final existing = await _deviceRegRepo.get();
-    if (existing != null) return existing['device_id'] as String;
-    final newId = 'DEV${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999).toString().padLeft(5, '0')}';
-    await _deviceRegRepo.insert({'device_id': newId, 'device_name': '', 'clinic_id': ''});
-    return newId;
+    try {
+      final existing = await _deviceRegRepo.get();
+      if (existing != null) return existing['device_id'] as String;
+      final newId = 'DEV${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999).toString().padLeft(5, '0')}';
+      await _deviceRegRepo.insert({'device_id': newId, 'device_name': '', 'clinic_id': ''});
+      return newId;
+    } catch (e) {
+      debugPrint('SYNC WARNING: device registry unavailable ($e) — using in-memory device id');
+      return 'DEV${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999).toString().padLeft(5, '0')}';
+    }
   }
 
   String _getDeviceName() {
