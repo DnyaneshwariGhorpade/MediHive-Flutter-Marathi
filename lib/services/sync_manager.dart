@@ -360,7 +360,28 @@ class SyncManager extends ChangeNotifier {
         final tempFile = File('${Directory.systemTemp.path}/${opdId}_${DateTime.now().microsecondsSinceEpoch}.jpg');
         try {
           await tempFile.writeAsBytes(bytes);
-          await ApiService.cloudUploadImages(opdId, [tempFile]);
+          final response = await ApiService.cloudUploadImages(opdId, [tempFile]);
+          final urls = (response['drive_urls'] as List<dynamic>?)?.map((u) => u.toString()).toList() ?? [];
+          if (urls.isNotEmpty) {
+            final opdRow = await _opdRepo.getByOpdId(opdId);
+            final localOpdId = opdRow?['id'] as int? ?? 0;
+            final localPatientId = opdRow?['patient_id'] as int? ?? 0;
+            for (final u in urls) {
+              final normUrl = _normalizeDriveUrl(u);
+              final maxImgId = await _imagesRepo.getMaxId();
+              await _imagesRepo.insert({
+                'id': maxImgId + 1,
+                'patient_id': localPatientId,
+                'opd_visit_id': localOpdId,
+                'file_path': null,
+                'image_type': 'document',
+                'sync_status': 'synced',
+                'uploaded_at': DateTime.now().toIso8601String(),
+                'created_at': DateTime.now().toIso8601String(),
+                'drive_url': normUrl,
+              });
+            }
+          }
           await docBox.delete(opdId);
         } catch (e) {
           debugPrint('SYNC image upload failed for $opdId: $e');
@@ -477,14 +498,15 @@ class SyncManager extends ChangeNotifier {
   }
 
   /// Convert a Google Drive share URL to a directly loadable image URL.
-  /// e.g. https://drive.google.com/file/d/ID/view -> https://drive.google.com/uc?export=view&id=ID
+  /// Convert a Google Drive share URL or UC URL to standard view URL.
+  /// e.g. https://drive.google.com/file/d/ID/view?usp=sharing
   String _normalizeDriveUrl(String url) {
     final trimmed = url.trim();
     if (trimmed.isEmpty) return '';
-    final fileIdMatch = RegExp(r'/file/d/([^/]+)').firstMatch(trimmed);
+    final fileIdMatch = RegExp(r'(?:/file/d/|id=)([^/&?]+)').firstMatch(trimmed);
     if (fileIdMatch != null) {
       final fileId = fileIdMatch.group(1)!;
-      return 'https://drive.google.com/uc?export=view&id=$fileId';
+      return 'https://drive.google.com/file/d/$fileId/view?usp=sharing';
     }
     return trimmed;
   }

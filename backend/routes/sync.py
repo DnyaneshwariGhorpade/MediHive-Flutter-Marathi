@@ -734,36 +734,69 @@ def sync_upload_images(opd_id):
         logger.warning("No valid image files for OPD %s", opd_id)
         return jsonify({'error': 'No valid image files provided'}), 400
 
-    import tempfile
-    import shutil
+    drive_urls = []
+    direct_upload_success = False
 
-    local_upload_dir = os.path.join(tempfile.gettempdir(), f"medihive_uploads_{opd_id}")
-    if os.path.exists(local_upload_dir):
-        try:
-            shutil.rmtree(local_upload_dir)
-        except Exception:
-            pass
-    os.makedirs(local_upload_dir, exist_ok=True)
+    # 1. Attempt direct upload to Google Drive
+    try:
+        from drive_utils import upload_image_fileobj_to_drive
+        for i, f in enumerate(files, 1):
+            url = upload_image_fileobj_to_drive(opd_id, f, i)
+            if url:
+                drive_urls.append(url)
 
-    for i, f in enumerate(files, 1):
-        filename = f.filename or f"image_{i}.jpg"
-        safe_filename = "".join(c for c in filename if c.isalnum() or c in "._-")
-        filepath = os.path.join(local_upload_dir, f"{i:02d}_{safe_filename}")
-        f.save(filepath)
+        if drive_urls:
+            direct_upload_success = True
+            urls_text = "\n".join(drive_urls)
+            OPDRecord.set_image_links(opd_id, urls_text, clinic_id=clinic_id)
+            logger.info("Direct Drive upload success for OPD %s: %s", opd_id, drive_urls)
 
-    device_id = request.headers.get('X-Device-ID') or request.form.get('device_id')
+            # 2. Immediately update Google Sheet with new Image Links
+            try:
+                from sheets_utils import upsert_opd_row_in_sheet
+                updated_opd = OPDRecord.get(opd_id, clinic_id=clinic_id) or opd
+                pat_id = updated_opd.get('patient_id')
+                patient = (Patient.get(pat_id, clinic_id=clinic_id) or Patient.get(pat_id)) if pat_id else {}
+                row_data = build_sheet_row_data(updated_opd, patient or {}, drive_urls)
+                upsert_opd_row_in_sheet(opd_id, row_data)
+                logger.info("Google Sheet row updated with Drive image links for OPD %s", opd_id)
+            except Exception as se:
+                logger.warning("Failed to update Google Sheet directly for OPD %s: %s", opd_id, se)
+    except Exception as e:
+        logger.warning("Direct Google Drive upload failed for OPD %s (%s). Falling back to background queue.", opd_id, e)
 
-    from services.sync_worker import enqueue_sync_event
-    enqueue_sync_event('opd_visit', opd_id, operation='upload_images', clinic_id=clinic_id, origin_device_id=device_id)
+    # 3. Fallback: Save to temp directory and enqueue background sync worker if direct upload failed
+    if not direct_upload_success:
+        import tempfile
+        import shutil
 
-    logger.info("Saved %d image(s) to temp directory for background sync upload: OPD=%s", len(files), opd_id)
+        local_upload_dir = os.path.join(tempfile.gettempdir(), f"medihive_uploads_{opd_id}")
+        if os.path.exists(local_upload_dir):
+            try:
+                shutil.rmtree(local_upload_dir)
+            except Exception:
+                pass
+        os.makedirs(local_upload_dir, exist_ok=True)
+
+        for i, f in enumerate(files, 1):
+            f.seek(0)
+            filename = f.filename or f"image_{i}.jpg"
+            safe_filename = "".join(c for c in filename if c.isalnum() or c in "._-")
+            filepath = os.path.join(local_upload_dir, f"{i:02d}_{safe_filename}")
+            f.save(filepath)
+
+        device_id = request.headers.get('X-Device-ID') or request.form.get('device_id')
+        from services.sync_worker import enqueue_sync_event
+        enqueue_sync_event('opd_visit', opd_id, operation='upload_images', clinic_id=clinic_id, origin_device_id=device_id)
+
+        logger.info("Saved %d image(s) to temp directory for fallback background sync: OPD=%s", len(files), opd_id)
 
     response = {
         'opd_id': opd_id,
-        'image_count': len(files),
-        'drive_urls': [],
-        'images_uploaded': False,
-        'message': 'Images saved locally; background Google Drive and Google Sheet sync enqueued'
+        'image_count': len(drive_urls) if direct_upload_success else len(files),
+        'drive_urls': drive_urls,
+        'images_uploaded': direct_upload_success,
+        'message': 'Images uploaded to Google Drive and Google Sheet updated' if direct_upload_success else 'Images queued for background sync'
     }
     return jsonify(response), 200
 
