@@ -161,20 +161,34 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> signInWithGoogle() async {
     _isLoading = true;
+    _loginError = '';
     notifyListeners();
 
-    final user = await _authService.signInWithGoogle();
+    try {
+      final user = await _authService.signInWithGoogle();
 
-    if (user != null) {
-      _isAuthenticated = true;
-      _currentUser = user;
-      await _storageService.setLoggedIn(true);
-      SyncManager().forceSyncNow(immediate: true);
+      if (user != null) {
+        _isAuthenticated = true;
+        _currentUser = user;
+        _clinicId = user.clinicId;
+        final prefs = await SharedPreferences.getInstance();
+        if (_clinicId.isNotEmpty) {
+          await prefs.setString('clinic_id', _clinicId);
+        }
+        await _storageService.setLoggedIn(true);
+        SyncManager().forceSyncNow(immediate: true);
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return user != null;
+    } catch (e) {
+      debugPrint('AuthProvider.signInWithGoogle error: $e');
+      _loginError = 'Google sign-in error: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
-
-    _isLoading = false;
-    notifyListeners();
-    return user != null;
   }
 
   Future<void> signOut() async {

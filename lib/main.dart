@@ -295,12 +295,13 @@ final _router = GoRouter(
     final isGoingToLogin = state.matchedLocation == '/login';
     final isGoingToSplash = state.matchedLocation == '/';
     final isGoingTo2FA = state.matchedLocation == '/2fa-verify';
+    final isGoingToRegister = state.matchedLocation == '/register';
 
     if (!auth.hasLoadedCredentials && !isGoingToSplash) {
       return '/';
     }
 
-    if (auth.hasLoadedCredentials && !auth.isAuthenticated && !isGoingToLogin && !isGoingToSplash && !isGoingTo2FA) {
+    if (auth.hasLoadedCredentials && !auth.isAuthenticated && !isGoingToLogin && !isGoingToSplash && !isGoingTo2FA && !isGoingToRegister) {
       return '/login';
     }
 
@@ -308,7 +309,7 @@ final _router = GoRouter(
       return '/2fa-verify';
     }
 
-    if (!auth.needs2FA && auth.isAuthenticated && (isGoingToLogin || isGoingToSplash || isGoingTo2FA)) {
+    if (!auth.needs2FA && auth.isAuthenticated && (isGoingToLogin || isGoingToSplash || isGoingTo2FA || isGoingToRegister)) {
       return '/app';
     }
 

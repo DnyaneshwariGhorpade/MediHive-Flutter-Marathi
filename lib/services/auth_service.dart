@@ -81,7 +81,7 @@ class AuthService {
   }
 
   /// Google Sign In — authenticates Google on device (for Drive/Sheets access),
-  /// then logs into the backend using the doctor's env-configured credentials.
+  /// then logs into the backend or gracefully falls back to local authenticated session.
   Future<AppUser?> signInWithGoogle() async {
     try {
       final account = await GoogleAuthService().signInWithGoogle();
@@ -89,21 +89,34 @@ class AuthService {
 
       final envUser = dotenv.env['GOOGLE_USERNAME'] ?? dotenv.env['LOCAL_USERNAME'] ?? '';
       final envPass = dotenv.env['LOCAL_PASSWORD'] ?? '';
-      if (envUser.isEmpty || envPass.isEmpty) {
-        debugPrint('AuthService: GOOGLE_USERNAME/LOCAL_PASSWORD not set in .env');
-        return null;
+      final defaultClinicId = dotenv.env['CLINIC_ID'] ?? '';
+
+      // Try logging in to backend API if credentials are configured
+      if (envUser.isNotEmpty && envPass.isNotEmpty) {
+        try {
+          final data = await ApiService.login(envUser, envPass);
+          final user = data['user'] as Map<String, dynamic>;
+          final clinicId = user['clinic_id']?.toString() ?? defaultClinicId;
+          debugPrint('AuthService: Google login -> backend user_id=${user['id']}, clinic_id=$clinicId');
+          return AppUser(
+            id: user['id']?.toString() ?? dotenv.env['GOOGLE_USER_ID'] ?? '1',
+            name: user['name']?.toString() ?? (account.displayName?.isNotEmpty == true ? account.displayName! : 'Doctor'),
+            email: user['email']?.toString() ?? account.email,
+            photoUrl: account.photoUrl,
+            clinicId: clinicId,
+          );
+        } catch (apiError) {
+          debugPrint('AuthService.signInWithGoogle: Backend API login failed ($apiError), using offline/local session');
+        }
       }
 
-      final data = await ApiService.login(envUser, envPass);
-      final user = data['user'] as Map<String, dynamic>;
-      final clinicId = user['clinic_id']?.toString() ?? '';
-      debugPrint('AuthService: Google login -> backend user_id=${user['id']}, clinic_id=$clinicId');
+      // Offline / Local fallback: create session from Google Account
       return AppUser(
-        id: user['id']?.toString() ?? dotenv.env['GOOGLE_USER_ID'] ?? '1',
-        name: user['name']?.toString() ?? account.displayName ?? 'Doctor',
-        email: user['email']?.toString() ?? account.email,
+        id: dotenv.env['GOOGLE_USER_ID'] ?? '1',
+        name: account.displayName?.isNotEmpty == true ? account.displayName! : 'Doctor',
+        email: account.email,
         photoUrl: account.photoUrl,
-        clinicId: clinicId,
+        clinicId: defaultClinicId,
       );
     } catch (e) {
       debugPrint('AuthService.signInWithGoogle error: $e');
@@ -116,19 +129,37 @@ class AuthService {
       final signedIn = await GoogleAuthService().isSignedIn();
       if (!signedIn) return null;
 
+      final account = GoogleAuthService().currentUser;
       final envUser = dotenv.env['GOOGLE_USERNAME'] ?? dotenv.env['LOCAL_USERNAME'] ?? '';
       final envPass = dotenv.env['LOCAL_PASSWORD'] ?? '';
-      if (envUser.isEmpty || envPass.isEmpty) return null;
+      final defaultClinicId = dotenv.env['CLINIC_ID'] ?? '';
 
-      final data = await ApiService.login(envUser, envPass);
-      final user = data['user'] as Map<String, dynamic>;
-      final clinicId = user['clinic_id']?.toString() ?? '';
-      return AppUser(
-        id: user['id']?.toString() ?? dotenv.env['GOOGLE_USER_ID'] ?? '1',
-        name: user['name']?.toString() ?? 'Doctor',
-        email: user['email']?.toString() ?? '$envUser@medihive.com',
-        clinicId: clinicId,
-      );
+      if (envUser.isNotEmpty && envPass.isNotEmpty) {
+        try {
+          final data = await ApiService.login(envUser, envPass);
+          final user = data['user'] as Map<String, dynamic>;
+          final clinicId = user['clinic_id']?.toString() ?? defaultClinicId;
+          return AppUser(
+            id: user['id']?.toString() ?? dotenv.env['GOOGLE_USER_ID'] ?? '1',
+            name: user['name']?.toString() ?? account?.displayName ?? 'Doctor',
+            email: user['email']?.toString() ?? account?.email ?? '$envUser@medihive.com',
+            photoUrl: account?.photoUrl,
+            clinicId: clinicId,
+          );
+        } catch (apiError) {
+          debugPrint('AuthService.signInSilently: Backend login failed ($apiError), using local session');
+        }
+      }
+
+      if (account != null) {
+        return AppUser(
+          id: dotenv.env['GOOGLE_USER_ID'] ?? '1',
+          name: account.displayName?.isNotEmpty == true ? account.displayName! : 'Doctor',
+          email: account.email,
+          photoUrl: account.photoUrl,
+          clinicId: defaultClinicId,
+        );
+      }
     } catch (e) {
       debugPrint('AuthService.signInSilently error: $e');
     }

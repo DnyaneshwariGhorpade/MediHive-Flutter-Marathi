@@ -9,6 +9,9 @@ import '../../widgets/section_card.dart';
 import '../../services/backup_code_service.dart';
 import '../../l10n/app_localizations.dart';
 
+import '../../services/api_service.dart';
+import '../../providers/auth_provider.dart';
+
 class AuthSettingsScreen extends StatefulWidget {
   const AuthSettingsScreen({super.key});
   @override
@@ -81,18 +84,34 @@ class _AuthSettingsScreenState extends State<AuthSettingsScreen> {
 
     setState(() => _isUpdating = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedPassword = prefs.getString('app_password') ?? 'admin123';
-      if (_currentCtrl.text != savedPassword) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(l10n.currentPasswordIncorrect),
-            backgroundColor: AppTheme.danger,
-          ));
+      bool cloudUpdated = false;
+      try {
+        await ApiService.changePassword(
+          currentPassword: _currentCtrl.text,
+          newPassword: _newCtrl.text,
+        );
+        cloudUpdated = true;
+      } catch (apiError) {
+        debugPrint('Cloud password update notice: $apiError');
+        final prefs = await SharedPreferences.getInstance();
+        final savedPassword = prefs.getString('app_password') ?? 'admin123';
+        if (_currentCtrl.text != savedPassword && !cloudUpdated) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(apiError.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: AppTheme.danger,
+            ));
+          }
+          return;
         }
-        return;
       }
+
+      final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_password', _newCtrl.text);
+      if (mounted) {
+        context.read<AuthProvider>().setPassword(_newCtrl.text);
+      }
+
       _currentCtrl.clear();
       _newCtrl.clear();
       _confirmCtrl.clear();

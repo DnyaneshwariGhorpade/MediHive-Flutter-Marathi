@@ -93,6 +93,23 @@ class DatabaseHelper {
         try { await db.execute("ALTER TABLE patients ADD COLUMN weight FLOAT"); } catch (_) {}
         debugPrint('Applied migration v6: added weight column to patients');
         break;
+      case 7:
+        try { await db.execute("ALTER TABLE opd_visits ADD COLUMN blood_group VARCHAR"); } catch (_) {}
+        try { await db.execute("ALTER TABLE opd_visits ADD COLUMN image_links TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE opd_visits ADD COLUMN user_id TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE patient_images ADD COLUMN user_id TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE patient_images ADD COLUMN clinic_id TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE calendar_notes ADD COLUMN user_id TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE calendar_notes ADD COLUMN clinic_id TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE clinic_settings ADD COLUMN clinic_id TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE users ADD COLUMN name VARCHAR"); } catch (_) {}
+        try { await db.execute("ALTER TABLE users ADD COLUMN clinic_id TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'doctor'"); } catch (_) {}
+        try { await db.execute("ALTER TABLE users ADD COLUMN device_id TEXT"); } catch (_) {}
+        try { await db.execute("ALTER TABLE users ADD COLUMN sync_status TEXT DEFAULT 'pending'"); } catch (_) {}
+        try { await db.execute("ALTER TABLE users ADD COLUMN last_synced_at DATETIME"); } catch (_) {}
+        debugPrint('Applied migration v7: aligned all tables to 100% cloud parity (blood_group, image_links, user_id, clinic_id, users fields)');
+        break;
       default:
         debugPrint('No migration defined for version $targetVersion');
     }

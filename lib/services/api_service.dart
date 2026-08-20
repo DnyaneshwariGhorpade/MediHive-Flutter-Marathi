@@ -111,6 +111,22 @@ static String get baseUrl =>
     return _handleResponse(res);
   }
 
+  static Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await ensureToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/change-password'),
+      headers: _headers(),
+      body: jsonEncode({
+        'current_password': currentPassword,
+        'new_password': newPassword,
+      }),
+    );
+    return _handleResponse(res);
+  }
+
   // ─── Patients ──────────────────────────────────────
 
   static Future<List<dynamic>> getPatients({String? search}) async {

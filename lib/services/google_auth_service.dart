@@ -3,12 +3,18 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GoogleAuthService {
   GoogleSignIn? _googleSignIn;
 
+  static const String _defaultServerClientId =
+      '290270748160-cp445caqpj3aab8p48v48ql8meuqah7d.apps.googleusercontent.com';
+
   GoogleSignIn get _signIn {
+    final serverClientId = dotenv.env['GOOGLE_SERVER_CLIENT_ID'] ?? _defaultServerClientId;
     _googleSignIn ??= GoogleSignIn(
+      serverClientId: serverClientId.isNotEmpty ? serverClientId : null,
       scopes: [
         drive.DriveApi.driveFileScope,
       ],

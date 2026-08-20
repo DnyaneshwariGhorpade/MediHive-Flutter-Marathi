@@ -1,4 +1,4 @@
-const int databaseVersion = 6;
+const int databaseVersion = 7;
 
 const String tablePatients = 'patients';
 const String tableOpdVisits = 'opd_visits';
@@ -57,6 +57,9 @@ String get createOpdVisitsTable => '''
     followup_status VARCHAR,
     clinic_id TEXT,
     device_id TEXT,
+    user_id TEXT,
+    blood_group VARCHAR,
+    image_links TEXT,
     sync_status TEXT DEFAULT 'pending',
     last_synced_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -73,6 +76,8 @@ String get createCalendarNotesTable => '''
     id INTEGER NOT NULL,
     note_date DATE NOT NULL,
     note_text TEXT,
+    user_id TEXT,
+    clinic_id TEXT,
     created_at DATETIME,
     updated_at DATETIME,
     PRIMARY KEY (id),
@@ -98,6 +103,7 @@ String get createClinicSettingsTable => '''
     smtp_password VARCHAR(255),
     smtp_server VARCHAR(255),
     smtp_port VARCHAR(10),
+    clinic_id TEXT,
     created_at DATETIME,
     updated_at DATETIME,
     PRIMARY KEY (id)
@@ -109,7 +115,13 @@ String get createUsersTable => '''
     id INTEGER NOT NULL,
     username VARCHAR(50) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR,
     email VARCHAR(255) NOT NULL,
+    clinic_id TEXT,
+    role VARCHAR DEFAULT 'doctor',
+    device_id TEXT,
+    sync_status TEXT DEFAULT 'pending',
+    last_synced_at DATETIME,
     created_at DATETIME,
     reset_otp VARCHAR(10),
     otp_expiry DATETIME,
@@ -145,6 +157,8 @@ String get createPatientImagesTable => '''
     uploaded_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     drive_url TEXT,
+    user_id TEXT,
+    clinic_id TEXT,
     PRIMARY KEY (id),
     FOREIGN KEY (patient_id) REFERENCES $tablePatients (id),
     FOREIGN KEY (opd_visit_id) REFERENCES $tableOpdVisits (id)

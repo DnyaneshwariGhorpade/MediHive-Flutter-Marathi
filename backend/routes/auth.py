@@ -4,6 +4,7 @@ from database import get_db
 from datetime import datetime
 import hashlib
 import time
+import uuid
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -205,3 +206,44 @@ def me():
     if user is None:
         return jsonify({'error': 'User not found'}), 404
     return jsonify({'user': dict(user)}), 200
+
+
+@auth_bp.route('/change-password', methods=['POST'])
+@jwt_required()
+def change_password():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Request body required'}), 400
+
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+
+    if not current_password or not new_password:
+        return jsonify({'error': 'Current and new password required'}), 400
+
+    if len(new_password) < 4:
+        return jsonify({'error': 'New password must be at least 4 characters'}), 400
+
+    hashed_current = hashlib.sha256(current_password.encode()).hexdigest()
+    hashed_new = hashlib.sha256(new_password.encode()).hexdigest()
+
+    with get_db() as db:
+        user = db.execute(
+            "SELECT id, password FROM users WHERE id = %s",
+            (user_id,)
+        ).fetchone()
+
+        if user is None:
+            return jsonify({'error': 'User not found'}), 404
+
+        if user['password'] != hashed_current:
+            return jsonify({'error': 'Current password is incorrect'}), 400
+
+        db.execute(
+            "UPDATE users SET password = %s WHERE id = %s",
+            (hashed_new, user_id)
+        )
+        db.commit()
+
+    return jsonify({'message': 'Password updated successfully'}), 200
