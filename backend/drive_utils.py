@@ -192,12 +192,9 @@ def upload_image_fileobj_to_drive(opd_id, file_storage, index):
         uploaded = service.files().create(
             body={"name": safe_name, "parents": [DRIVE_ROOT_FOLDER_ID]},
             media_body=media,
-            fields="id"
+            fields="id",
+            supportsAllDrives=True
         ).execute()
-    except HttpError as e:
-        logger.error("DRIVE_UPLOAD_FILEOBJ: files().create() FAILED: OPD=%s index=%d error=%s",
-                     opd_id, index, e)
-        raise
     except Exception as e:
         logger.error("DRIVE_UPLOAD_FILEOBJ: files().create() FAILED: OPD=%s index=%d error=%s",
                      opd_id, index, e)
@@ -210,12 +207,12 @@ def upload_image_fileobj_to_drive(opd_id, file_storage, index):
     try:
         service.permissions().create(
             fileId=file_id,
-            body={"type": "anyone", "role": "reader"}
+            body={"type": "anyone", "role": "reader"},
+            supportsAllDrives=True
         ).execute()
         logger.info("DRIVE_UPLOAD_FILEOBJ: Permission set SUCCESS for file_id=%s", file_id)
-    except HttpError as e:
-        logger.error("DRIVE_UPLOAD_FILEOBJ: Permission set FAILED for file_id=%s: %s", file_id, e)
-        raise
+    except Exception as e:
+        logger.warning("DRIVE_UPLOAD_FILEOBJ: Permission set non-fatal notice for file_id=%s: %s", file_id, e)
 
     public_url = f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
     logger.info("DRIVE_UPLOAD_FILEOBJ: COMPLETE: OPD=%s index=%d url=%s", opd_id, index, public_url)

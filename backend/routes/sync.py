@@ -741,6 +741,10 @@ def sync_upload_images(opd_id):
     try:
         from drive_utils import upload_image_fileobj_to_drive
         for i, f in enumerate(files, 1):
+            try:
+                f.seek(0)
+            except Exception:
+                pass
             url = upload_image_fileobj_to_drive(opd_id, f, i)
             if url:
                 drive_urls.append(url)
@@ -754,16 +758,16 @@ def sync_upload_images(opd_id):
             # 2. Immediately update Google Sheet with new Image Links
             try:
                 from sheets_utils import upsert_opd_row_in_sheet
-                updated_opd = OPDRecord.get(opd_id, clinic_id=clinic_id) or opd
+                updated_opd = (OPDRecord.get(opd_id, clinic_id=clinic_id) if clinic_id else OPDRecord.get(opd_id)) or opd
                 pat_id = updated_opd.get('patient_id')
-                patient = (Patient.get(pat_id, clinic_id=clinic_id) or Patient.get(pat_id)) if pat_id else {}
+                patient = (Patient.get(pat_id, clinic_id=clinic_id) if clinic_id else Patient.get(pat_id)) if pat_id else {}
                 row_data = build_sheet_row_data(updated_opd, patient or {}, drive_urls)
                 upsert_opd_row_in_sheet(opd_id, row_data)
                 logger.info("Google Sheet row updated with Drive image links for OPD %s", opd_id)
             except Exception as se:
                 logger.warning("Failed to update Google Sheet directly for OPD %s: %s", opd_id, se)
     except Exception as e:
-        logger.warning("Direct Google Drive upload failed for OPD %s (%s). Falling back to background queue.", opd_id, e)
+        logger.exception("Direct Google Drive upload failed for OPD %s: %s", opd_id, e)
 
     # 3. Fallback: Save to temp directory and enqueue background sync worker if direct upload failed
     if not direct_upload_success:
