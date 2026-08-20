@@ -750,16 +750,19 @@ def sync_upload_images(opd_id):
             
             logger.info("Direct Drive upload success for OPD %s: %s", opd_id, drive_urls)
 
-            # 2. Immediately update Google Sheet with new Image Links
+            # 2. Immediately update Google Sheet with new Image Links (if OPD already has patient data)
             try:
                 from sheets_utils import upsert_opd_row_in_sheet
                 from routes.opd import build_sheet_row_data
                 updated_opd = (OPDRecord.get(opd_id, clinic_id=clinic_id) if clinic_id else OPDRecord.get(opd_id)) or {}
                 pat_id = updated_opd.get('patient_id') if isinstance(updated_opd, dict) else ''
-                patient = ((Patient.get(pat_id, clinic_id=clinic_id) if clinic_id else Patient.get(pat_id)) if pat_id else {}) or {}
-                row_data = build_sheet_row_data(updated_opd, patient, drive_urls)
-                upsert_opd_row_in_sheet(opd_id, row_data)
-                logger.info("Google Sheet row updated with Drive image links for OPD %s", opd_id)
+                if pat_id:
+                    patient = (Patient.get(pat_id, clinic_id=clinic_id) if clinic_id else Patient.get(pat_id)) or {}
+                    row_data = build_sheet_row_data(updated_opd, patient, drive_urls)
+                    upsert_opd_row_in_sheet(opd_id, row_data)
+                    logger.info("Google Sheet row updated with Drive image links for OPD %s", opd_id)
+                else:
+                    logger.info("OPD %s has no patient_id yet; deferring sheet update to sync push", opd_id)
             except Exception as se:
                 logger.warning("Failed to update Google Sheet directly for OPD %s: %s", opd_id, se)
         else:

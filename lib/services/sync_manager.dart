@@ -386,24 +386,28 @@ class SyncManager extends ChangeNotifier {
             final localOpdId = opdRow?['id'] as int? ?? 0;
             final localPatientId = opdRow?['patient_id'] as int? ?? 0;
             final normUrls = urls.map(_normalizeDriveUrl).toList();
-            for (final u in normUrls) {
-              final maxImgId = await _imagesRepo.getMaxId();
-              await _imagesRepo.insert({
-                'id': maxImgId + 1,
-                'patient_id': localPatientId,
-                'opd_visit_id': localOpdId,
-                'file_path': null,
-                'image_type': 'document',
-                'sync_status': 'synced',
-                'uploaded_at': DateTime.now().toIso8601String(),
-                'created_at': DateTime.now().toIso8601String(),
-                'drive_url': u,
-              });
-            }
-            // Mirror the Drive URLs back into the local OPD record so the
-            // patient card/details can render the attachments immediately.
-            if (localOpdId > 0) {
-              await _opdRepo.update(localOpdId, {'image_links': normUrls.join('\n')});
+            try {
+              for (final u in normUrls) {
+                final maxImgId = await _imagesRepo.getMaxId();
+                await _imagesRepo.insert({
+                  'id': maxImgId + 1,
+                  'patient_id': localPatientId,
+                  'opd_visit_id': localOpdId,
+                  'file_path': '',
+                  'image_type': 'document',
+                  'sync_status': 'synced',
+                  'uploaded_at': DateTime.now().toIso8601String(),
+                  'created_at': DateTime.now().toIso8601String(),
+                  'drive_url': u,
+                });
+              }
+              // Mirror the Drive URLs back into the local OPD record so the
+              // patient card/details can render the attachments immediately.
+              if (localOpdId > 0) {
+                await _opdRepo.update(localOpdId, {'image_links': normUrls.join('\n')});
+              }
+            } catch (e) {
+              debugPrint('SYNC: Failed to cache image records locally for $opdId: $e');
             }
             await docBox.delete(opdId);
             debugPrint('SYNC image upload SUCCESS for $opdId: ${normUrls.length} URL(s)');
@@ -520,7 +524,7 @@ class SyncManager extends ChangeNotifier {
           'id': nextId,
           'patient_id': localPatientId,
           'opd_visit_id': localOpdId,
-          'file_path': null,
+          'file_path': '',
           'image_type': 'document',
           'sync_status': 'synced',
           'uploaded_at': DateTime.now().toIso8601String(),

@@ -5,6 +5,7 @@ import '../services/storage_service.dart';
 import '../services/backup_code_service.dart';
 import '../services/api_service.dart';
 import '../services/sync_manager.dart';
+import '../services/google_auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -184,7 +185,7 @@ class AuthProvider extends ChangeNotifier {
       return user != null;
     } catch (e) {
       debugPrint('AuthProvider.signInWithGoogle error: $e');
-      _loginError = 'Google sign-in error: $e';
+      _loginError = GoogleAuthService().parseGoogleSignInError(e);
       _isLoading = false;
       notifyListeners();
       return false;

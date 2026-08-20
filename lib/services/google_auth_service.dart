@@ -14,7 +14,9 @@ class GoogleAuthService {
     final serverClientId = useServerClientId
         ? (dotenv.env['GOOGLE_SERVER_CLIENT_ID'] ?? _defaultServerClientId)
         : null;
+    final clientId = kIsWeb ? (dotenv.env['GOOGLE_CLIENT_ID_WEB'] ?? serverClientId) : null;
     return GoogleSignIn(
+      clientId: clientId,
       serverClientId: (serverClientId != null && serverClientId.isNotEmpty) ? serverClientId : null,
       scopes: const [
         'email',
@@ -45,9 +47,34 @@ class GoogleAuthService {
 
   Stream<GoogleSignInAccount?> get onAuthStateChanged => _authController.stream;
 
+  String parseGoogleSignInError(dynamic error) {
+    if (error == null) return 'Google sign-in failed.';
+    final str = error.toString().toLowerCase();
+    if (str.contains('10') || str.contains('developer_error')) {
+      return 'Configuration error (ApiException 10): Ensure the SHA-1 fingerprint and package name (com.innovatehive.medihive) are registered in Google Cloud Console.';
+    } else if (str.contains('12500') || str.contains('12501') || str.contains('sign_in_canceled') || str.contains('canceled') || str.contains('cancelled')) {
+      return 'Sign-in cancelled by user.';
+    } else if (str.contains('7') || str.contains('network_error') || str.contains('socketexception') || str.contains('handshakeexception')) {
+      return 'Network error: Please check your internet connection.';
+    } else if (str.contains('403') || str.contains('access_denied')) {
+      return 'Access denied: Ensure your account is added to Test Users in Google Cloud Console.';
+    }
+    return 'Google sign-in error: $error';
+  }
+
   Future<void> init() async {
     try {
-      await _signIn.signInSilently();
+      final account = await _signIn.signInSilently();
+      if (account != null) {
+        final auth = await account.authentication;
+        if (auth.accessToken != null) {
+          await _secureStorage.write(key: _keyAccessToken, value: auth.accessToken);
+        }
+        if (auth.idToken != null) {
+          await _secureStorage.write(key: _keyIdToken, value: auth.idToken);
+        }
+        _authController.add(account);
+      }
     } catch (e) {
       debugPrint('GoogleAuthService init silent sign-in skipped: $e');
     }
@@ -115,6 +142,10 @@ class GoogleAuthService {
         if (auth.accessToken != null) {
           await _secureStorage.write(key: _keyAccessToken, value: auth.accessToken);
         }
+        if (auth.idToken != null) {
+          await _secureStorage.write(key: _keyIdToken, value: auth.idToken);
+        }
+        _authController.add(account);
         return true;
       }
     } catch (_) {}

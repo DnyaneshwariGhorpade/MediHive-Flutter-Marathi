@@ -128,7 +128,7 @@ class SettingsProvider extends ChangeNotifier {
         await prefs.setBool('isSyncEnabled', true);
       }
     } catch (e) {
-      _googleAuthError = 'Sign-in failed: $e';
+      _googleAuthError = _googleAuthService.parseGoogleSignInError(e);
       rethrow;
     } finally {
       _isGoogleSigningIn = false;

@@ -64,17 +64,21 @@ class PatientImagesRepository {
 
   Future<int> insert(Map<String, dynamic> row) async {
     final db = await _db;
-    return db.insert(tablePatientImages, {
-      'id': row['id'],
-      'patient_id': row['patient_id'],
-      'opd_visit_id': row['opd_visit_id'],
-      'file_path': row['file_path'],
-      'image_type': row['image_type'],
-      'sync_status': row['sync_status'],
-      'uploaded_at': row['uploaded_at'],
-      'created_at': row['created_at'],
-      'drive_url': row['drive_url'],
-    });
+    return db.insert(
+      tablePatientImages,
+      {
+        'id': row['id'],
+        'patient_id': row['patient_id'],
+        'opd_visit_id': row['opd_visit_id'],
+        'file_path': row['file_path'] ?? '',
+        'image_type': row['image_type'],
+        'sync_status': row['sync_status'],
+        'uploaded_at': row['uploaded_at'],
+        'created_at': row['created_at'],
+        'drive_url': row['drive_url'],
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<int> update(int id, Map<String, dynamic> row) async {
