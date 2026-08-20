@@ -762,6 +762,8 @@ def sync_upload_images(opd_id):
                 logger.info("Google Sheet row updated with Drive image links for OPD %s", opd_id)
             except Exception as se:
                 logger.warning("Failed to update Google Sheet directly for OPD %s: %s", opd_id, se)
+        else:
+            logger.warning("Direct Drive upload generated 0 URLs for OPD %s", opd_id)
     except Exception as e:
         logger.exception("Direct Google Drive upload failed for OPD %s: %s", opd_id, e)
 

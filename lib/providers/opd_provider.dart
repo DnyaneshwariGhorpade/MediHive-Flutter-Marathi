@@ -748,6 +748,7 @@ class OpdProvider extends ChangeNotifier {
         try {
           final docBox = Hive.box('opd_documents');
           await docBox.put(opdId, base64Encode(documentBytes));
+          debugPrint('OPD SUBMIT: Successfully saved document for record $opdId (${documentBytes.length} bytes)');
         } catch (e, st) {
           debugPrint('WARN: Failed to save document for record $opdId: $e');
           debugPrint(st.toString());

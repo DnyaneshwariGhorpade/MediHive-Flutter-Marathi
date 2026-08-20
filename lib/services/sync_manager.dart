@@ -166,7 +166,10 @@ class SyncManager extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final lastSync = prefs.getString('last_flask_sync') ?? '';
 
-    // ── Push ──
+    // ── 1. Upload pending images first so Drive URLs are available for push ──
+    await _uploadPendingImages();
+
+    // ── 2. Push ──
     final pending = await _syncQueueRepo.getPending();
     debugPrint('SYNC PUSH: ${pending.length} pending queue entries');
     final pushPatients = <Map<String, dynamic>>[];
@@ -330,10 +333,7 @@ class SyncManager extends ChangeNotifier {
       } catch (_) {}
     }
 
-    // ── Upload images ──
-    await _uploadPendingImages();
-
-    // ── Pull ──
+    // ── 3. Pull ──
     final pullSync = lastSync.isEmpty ? '2000-01-01T00:00:00' : lastSync;
     try {
       final data = await ApiService.syncPull(pullSync);
@@ -373,6 +373,9 @@ class SyncManager extends ChangeNotifier {
         if (raw == null) continue;
 
         try {
+          // Ensure valid token before image upload
+          await ApiService.ensureToken();
+
           // Decode in-memory bytes and upload directly — works on Web,
           // Android, iOS and Windows without touching the filesystem.
           final bytes = base64Decode(raw.toString());
@@ -402,8 +405,11 @@ class SyncManager extends ChangeNotifier {
             if (localOpdId > 0) {
               await _opdRepo.update(localOpdId, {'image_links': normUrls.join('\n')});
             }
+            await docBox.delete(opdId);
+            debugPrint('SYNC image upload SUCCESS for $opdId: ${normUrls.length} URL(s)');
+          } else {
+            debugPrint('SYNC image upload returned 0 URLs for $opdId — keeping in Hive queue for retry');
           }
-          await docBox.delete(opdId);
         } catch (e) {
           debugPrint('SYNC image upload failed for $opdId: $e');
         }
@@ -737,6 +743,7 @@ class SyncManager extends ChangeNotifier {
       'next_visit': row['next_visit_date'] ?? '',
       'blood_group': row['blood_group'] ?? '',
       'previous_visit_date': row['next_visit_date'] ?? '',
+      'image_links': row['image_links'] ?? '',
       'created_at': createdDt.toIso8601String(),
       'updated_at': _resolveUpdatedAt(row),
     };

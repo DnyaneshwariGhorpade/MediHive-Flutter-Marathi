@@ -24,8 +24,6 @@ import '../../utils/medical_data.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import '../../repositories/opd_record_repository.dart';
-import '../../repositories/patient_repository.dart';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../l10n/app_localizations.dart';
@@ -550,42 +548,9 @@ class _OpdRegistrationScreenState extends State<OpdRegistrationScreen> {
                               if (widget.editOpdId != null &&
                                   widget.editOpdId!.isNotEmpty) {
                                 existingId = widget.editOpdId;
-                                debugPrint('OPD SAVE: using direct editOpdId=$existingId');
-                              } else if (widget.editPatientId != null &&
-                                  widget.editPatientId!.isNotEmpty) {
-                                final patientSyncId = widget.editPatientId!;
-                                final patientRepo = PatientRepository();
-                                final patient =
-                                    await patientRepo.getBySyncId(patientSyncId);
-                                if (patient != null) {
-                                  final sqlitePatientId = patient['id'] as int;
-                                  final opdRepo = OpdRecordRepository();
-                                  final records = await opdRepo
-                                      .getByPatientId(sqlitePatientId);
-                                  debugPrint('OPD SAVE: patientRecords=${records.length}');
-                                  if (records.isNotEmpty) {
-                                    final firstOpdId =
-                                        records.first['opd_id']?.toString();
-                                    debugPrint(
-                                        'OPD SAVE: firstRecord opd_id=$firstOpdId');
-                                    if (firstOpdId != null &&
-                                        firstOpdId.isNotEmpty) {
-                                      existingId = firstOpdId;
-                                    } else {
-                                      debugPrint(
-                                          'OPD SAVE WARNING: first record has null/empty opd_id');
-                                    }
-                                  } else {
-                                    debugPrint(
-                                        'OPD SAVE WARNING: no OPD records found for patient sqlitePatientId=$sqlitePatientId');
-                                  }
-                                } else {
-                                  debugPrint(
-                                      'OPD SAVE WARNING: patient not found by syncId=$patientSyncId');
-                                }
+                                debugPrint('OPD SAVE: using direct editOpdId=$existingId (EDIT MODE)');
                               } else {
-                                debugPrint(
-                                    'OPD SAVE: editPatientId is null/empty — will CREATE new OPD');
+                                debugPrint('OPD SAVE: creating NEW OPD visit (CREATE MODE)');
                               }
                               debugPrint('OPD SAVE: existingId=$existingId');
                               final success = await opd.submitRecord(
