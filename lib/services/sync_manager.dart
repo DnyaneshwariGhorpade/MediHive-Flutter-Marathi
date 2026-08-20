@@ -73,8 +73,17 @@ class SyncManager extends ChangeNotifier {
     try {
       _connectivitySubscription = _connectivity.isConnected.listen((connected) {
         if (!connected) {
-          _syncState = SyncState.offline;
-          notifyListeners();
+          // Don't flip to offline on a single plugin event — verify with a
+          // real reachability probe first (plugin can report 'none' wrongly).
+          _connectivity.probeReachability().then((reachable) {
+            if (!reachable) {
+              _syncState = SyncState.offline;
+              notifyListeners();
+            } else {
+              _debounceTimer?.cancel();
+              _debounceTimer = Timer(const Duration(seconds: 3), _trySync);
+            }
+          });
         } else {
           _debounceTimer?.cancel();
           _debounceTimer = Timer(const Duration(seconds: 3), _trySync);
@@ -116,8 +125,13 @@ class SyncManager extends ChangeNotifier {
 
   Future<void> _trySync() async {
     if (!_connectivity.currentStatus) {
-      debugPrint('SYNC SKIP: no connectivity');
-      return;
+      debugPrint('SYNC SKIP: no connectivity — probing reachability...');
+      final reachable = await _connectivity.probeReachability();
+      if (!reachable) {
+        debugPrint('SYNC SKIP: reachability probe failed — staying offline');
+        return;
+      }
+      debugPrint('SYNC: reachability probe passed — continuing sync');
     }
     if (_syncState == SyncState.syncing) {
       debugPrint('SYNC SKIP: already syncing');
@@ -633,7 +647,10 @@ class SyncManager extends ChangeNotifier {
   }
 
   Future<bool> fullRestore() async {
-    if (!_connectivity.currentStatus) return false;
+    if (!_connectivity.currentStatus) {
+      final reachable = await _connectivity.probeReachability();
+      if (!reachable) return false;
+    }
     _syncState = SyncState.syncing;
     notifyListeners();
 
